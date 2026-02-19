@@ -1,0 +1,12 @@
+# Rust build artifacts
+src-tauri/target/
+
+# Node
+node_modules/
+
+# Tauri generated (can be regenerated)
+src-tauri/gen/
+
+# OS
+.DS_Store
+Thumbs.db

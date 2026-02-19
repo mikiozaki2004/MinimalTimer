@@ -1,0 +1,30 @@
+{
+  "productName": "MinimalTimer",
+  "version": "0.1.0",
+  "identifier": "com.minimaltimer.app",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title":       "MinimalTimer",
+        "width":       280,
+        "height":      280,
+        "resizable":   false,
+        "decorations": false,
+        "transparent": true,
+        "shadow":      false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["../icon.ico"]
+  }
+}
