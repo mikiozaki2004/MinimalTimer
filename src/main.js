@@ -4,12 +4,13 @@ const THEMES = ['', 'light', 'sunset'];
 
 // ── State ──────────────────────────────────────────────────────────────────
 const st = {
-  mode:     'countdown',
-  running:  false,
-  elapsed:  0,
-  total:    25 * 60,
-  themeIdx: 0,
-  pinned:   false,
+  mode:         'countdown',
+  running:      false,
+  elapsed:      0,
+  total:        25 * 60,
+  themeIdx:     0,
+  pinned:       false,
+  sessionStart: null,
 };
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ const clockEl      = document.getElementById('clock');
 const ringEl       = document.getElementById('ring');
 const circle       = document.getElementById('circle');
 const btnPlay      = document.getElementById('btn-play');
+const btnPause     = document.getElementById('btn-pause');
 const btnReset     = document.getElementById('btn-reset');
 const btnMode      = document.getElementById('btn-mode');
 const btnTheme     = document.getElementById('btn-theme');
@@ -100,22 +102,33 @@ function tick(now) {
 }
 
 // ── Play icon helper ───────────────────────────────────────────────────────
+const iconStop = document.getElementById('icon-stop');
+
 function setPlayIcon(playing) {
   iconPlay.style.display  = playing ? 'none' : '';
-  iconPause.style.display = playing ? ''     : 'none';
+  iconStop.style.display  = playing ? ''     : 'none';
+  btnPause.style.display  = playing ? ''     : 'none';
 }
 
 // ── Button handlers ────────────────────────────────────────────────────────
 btnPlay.addEventListener('click', () => {
   if (st.running) logSession();
   st.running = !st.running;
+  if (st.running && st.sessionStart === null) st.sessionStart = Date.now();
   setPlayIcon(st.running);
+});
+
+btnPause.addEventListener('click', () => {
+  st.running = false;
+  setPlayIcon(false);
+  // sessionStart は保持（再開時に継続）
 });
 
 btnReset.addEventListener('click', () => {
   if (st.running) logSession();
   st.running = false;
   st.elapsed = 0;
+  st.sessionStart = null;
   lastSecond = -1;
   setPlayIcon(false);
   refreshText();
@@ -127,6 +140,7 @@ btnMode.addEventListener('click', () => {
   st.mode    = st.mode === 'countdown' ? 'countup' : 'countdown';
   st.running = false;
   st.elapsed = 0;
+  st.sessionStart = null;
   lastSecond = -1;
   setPlayIcon(false);
   refreshText();
@@ -218,6 +232,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   if (st.running) logSession();
   st.running = !st.running;
+  if (st.running && st.sessionStart === null) st.sessionStart = Date.now();
   setPlayIcon(st.running);
 });
 
@@ -328,10 +343,16 @@ let logs = JSON.parse(localStorage.getItem('mt_logs') || '[]');
 function logSession() {
   const duration = Math.floor(st.elapsed);
   if (duration < 5) return;
+  const endedAt = Date.now();
+  const startedAt = st.sessionStart ?? (endedAt - duration * 1000);
+  st.sessionStart = null;
   logs.push({
+    id:        Math.random().toString(36).slice(2),
     task:      currentTask || '(タスクなし)',
     duration,
-    timestamp: Date.now(),
+    startedAt,
+    endedAt,
+    mode:      st.mode,
   });
   localStorage.setItem('mt_logs', JSON.stringify(logs));
 }

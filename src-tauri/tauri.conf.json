@@ -9,6 +9,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label":       "main",
         "title":       "MinimalTimer",
         "width":       280,
         "height":      280,
@@ -16,6 +17,18 @@
         "decorations": false,
         "transparent": true,
         "shadow":      false
+      },
+      {
+        "label":       "records",
+        "url":         "records.html",
+        "title":       "記録",
+        "width":       360,
+        "height":      460,
+        "resizable":   false,
+        "decorations": false,
+        "transparent": true,
+        "shadow":      false,
+        "visible":     false
       }
     ],
     "security": {

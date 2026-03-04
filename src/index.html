@@ -29,9 +29,12 @@
 
     <!-- Control buttons (hover only) -->
     <div class="controls ctrl-fade">
-      <button class="btn" id="btn-play"  title="開始/停止">
+      <button class="btn" id="btn-play"  title="開始 / 停止（記録）">
         <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        <svg id="icon-stop" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 6h12v12H6z"/></svg>
+      </button>
+      <button class="btn" id="btn-pause" title="一時停止（記録しない）" style="display:none">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
       </button>
       <button class="btn" id="btn-reset" title="リセット">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>

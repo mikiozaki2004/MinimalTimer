@@ -5,20 +5,9 @@ fn open_records(app: tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("records") {
         let _ = win.show();
         let _ = win.set_focus();
-        return;
+        #[cfg(debug_assertions)]
+        win.open_devtools();
     }
-    let _ = tauri::WebviewWindowBuilder::new(
-        &app,
-        "records",
-        tauri::WebviewUrl::App("records.html".into()),
-    )
-    .title("記録")
-    .inner_size(360.0, 460.0)
-    .decorations(false)
-    .transparent(true)
-    .resizable(false)
-    .shadow(false)
-    .build();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
