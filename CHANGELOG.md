@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-03-04（一時停止ボタン実装）
+
+### やったこと
+
+#### 一時停止ボタンの追加
+- `index.html`: ⏸ ボタン（`btn-pause`）を追加。実行中のみ表示
+- `index.html`: 既存の停止ボタンのアイコンを ⏸ → ⏹（四角）に変更し、「記録して停止」であることを明示
+- `main.js`: `btnPause` ハンドラ実装 — `st.running = false` のみ実行し `logSession()` を呼ばない。`st.sessionStart` を保持するため、▶ で再開すると元の開始時刻から継続してカウントされる
+- `main.js`: `btnPlay` / Enter キーで `st.sessionStart` を上書きしないよう修正（`=== null` チェック追加）
+- `main.js`: `btnReset` / `btnMode` で `st.sessionStart = null` を明示的にクリア
+
+### 次回やること
+
+（未記入）
+
+---
+
 ## 2026-03-04（記録機能実装）
 
 ### やったこと
