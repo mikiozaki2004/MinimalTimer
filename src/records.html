@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="records.css">
+  <title>記録</title>
+</head>
+<body>
+  <div class="card" data-tauri-drag-region>
+
+    <header class="header" data-tauri-drag-region>
+      <span class="header-title">記録</span>
+      <div class="tabs">
+        <button class="tab active" id="tab-today">今日</button>
+        <button class="tab" id="tab-all">全期間</button>
+      </div>
+      <button class="close-btn" id="close-btn" title="閉じる">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </button>
+    </header>
+
+    <div class="list-wrap">
+      <div class="list" id="list"></div>
+    </div>
+
+    <footer class="footer">
+      <div class="footer-total">
+        <span class="footer-label">合計</span>
+        <span class="footer-time" id="footer-time">—</span>
+      </div>
+      <button class="reset-btn" id="reset-btn">リセット</button>
+    </footer>
+
+  </div>
+  <script src="records.js" type="module"></script>
+</body>
+</html>

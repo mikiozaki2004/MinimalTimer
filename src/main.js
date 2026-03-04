@@ -1,13 +1,13 @@
 // ── Constants ──────────────────────────────────────────────────────────────
-const CIRCUMFERENCE = 2 * Math.PI * 126;  // ≈ 791.68px
-const THEMES = ['', 'light', 'sunset'];   // body class names
+const CIRCUMFERENCE = 2 * Math.PI * 126;
+const THEMES = ['', 'light', 'sunset'];
 
 // ── State ──────────────────────────────────────────────────────────────────
 const st = {
   mode:     'countdown',
   running:  false,
-  elapsed:  0,           // seconds (float)
-  total:    25 * 60,     // seconds
+  elapsed:  0,
+  total:    25 * 60,
   themeIdx: 0,
   pinned:   false,
 };
@@ -15,22 +15,23 @@ const st = {
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const timerEl      = document.getElementById('timer');
 const timerInputEl = document.getElementById('timer-input');
-const clockEl  = document.getElementById('clock');
-const ringEl   = document.getElementById('ring');
-const circle   = document.getElementById('circle');
-const btnPlay  = document.getElementById('btn-play');
-const btnReset = document.getElementById('btn-reset');
-const btnMode  = document.getElementById('btn-mode');
-const btnTheme = document.getElementById('btn-theme');
-const btnPin   = document.getElementById('btn-pin');
-const btnTask  = document.getElementById('btn-task');
-const taskNameEl       = document.getElementById('task-name');
-const taskPanel        = document.getElementById('task-panel');
-const taskPanelList    = document.getElementById('task-panel-list');
-const taskPanelInput   = document.getElementById('task-panel-input');
-const taskPanelAddBtn  = document.getElementById('task-panel-add-btn');
-const iconPlay  = document.getElementById('icon-play');
-const iconPause = document.getElementById('icon-pause');
+const clockEl      = document.getElementById('clock');
+const ringEl       = document.getElementById('ring');
+const circle       = document.getElementById('circle');
+const btnPlay      = document.getElementById('btn-play');
+const btnReset     = document.getElementById('btn-reset');
+const btnMode      = document.getElementById('btn-mode');
+const btnTheme     = document.getElementById('btn-theme');
+const btnPin       = document.getElementById('btn-pin');
+const btnTask      = document.getElementById('btn-task');
+const btnRecords   = document.getElementById('btn-records');
+const taskNameEl      = document.getElementById('task-name');
+const taskPanel       = document.getElementById('task-panel');
+const taskPanelList   = document.getElementById('task-panel-list');
+const taskPanelInput  = document.getElementById('task-panel-input');
+const taskPanelAddBtn = document.getElementById('task-panel-add-btn');
+const iconPlay        = document.getElementById('icon-play');
+const iconPause       = document.getElementById('icon-pause');
 
 // ── Tauri window API ───────────────────────────────────────────────────────
 function tauriWin() {
@@ -48,7 +49,7 @@ function draw() {
   ringEl.style.strokeDashoffset = CIRCUMFERENCE * (1 - ratio);
 }
 
-// ── Text refresh (called once per second) ──────────────────────────────────
+// ── Text refresh ───────────────────────────────────────────────────────────
 function refreshText() {
   if (st.mode === 'countdown') {
     const rem = Math.max(0, st.total - st.elapsed);
@@ -57,9 +58,9 @@ function refreshText() {
     timerEl.textContent = `${pad(m)}:${pad(s)}`;
   } else {
     const total = Math.floor(st.elapsed);
-    const s  = total % 60;
-    const m  = Math.floor(total / 60) % 60;
-    const h  = Math.floor(total / 3600);
+    const s = total % 60;
+    const m = Math.floor(total / 60) % 60;
+    const h = Math.floor(total / 3600);
     timerEl.textContent = h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
   }
   clockEl.textContent = new Date().toLocaleTimeString('ja-JP', {
@@ -69,7 +70,7 @@ function refreshText() {
 
 const pad = n => String(n).padStart(2, '0');
 
-// ── Tick loop (requestAnimationFrame = 60fps, no CPU overhead) ─────────────
+// ── Tick loop ──────────────────────────────────────────────────────────────
 let lastTime   = performance.now();
 let lastSecond = -1;
 
@@ -83,13 +84,12 @@ function tick(now) {
       st.elapsed = st.total;
       st.running = false;
       setPlayIcon(false);
+      logSession();
     }
   }
 
-  // Ring: every frame (GPU animated, near-zero CPU cost)
   draw();
 
-  // Text: only when the second digit changes
   const sec = Math.floor(st.elapsed);
   if (sec !== lastSecond) {
     lastSecond = sec;
@@ -101,17 +101,19 @@ function tick(now) {
 
 // ── Play icon helper ───────────────────────────────────────────────────────
 function setPlayIcon(playing) {
-  iconPlay.style.display  = playing ? 'none'  : '';
-  iconPause.style.display = playing ? ''      : 'none';
+  iconPlay.style.display  = playing ? 'none' : '';
+  iconPause.style.display = playing ? ''     : 'none';
 }
 
 // ── Button handlers ────────────────────────────────────────────────────────
 btnPlay.addEventListener('click', () => {
+  if (st.running) logSession();
   st.running = !st.running;
   setPlayIcon(st.running);
 });
 
 btnReset.addEventListener('click', () => {
+  if (st.running) logSession();
   st.running = false;
   st.elapsed = 0;
   lastSecond = -1;
@@ -121,6 +123,7 @@ btnReset.addEventListener('click', () => {
 });
 
 btnMode.addEventListener('click', () => {
+  if (st.running) logSession();
   st.mode    = st.mode === 'countdown' ? 'countup' : 'countdown';
   st.running = false;
   st.elapsed = 0;
@@ -133,12 +136,17 @@ btnMode.addEventListener('click', () => {
 btnTheme.addEventListener('click', () => {
   st.themeIdx = (st.themeIdx + 1) % THEMES.length;
   document.body.className = THEMES[st.themeIdx];
+  localStorage.setItem('mt_theme', THEMES[st.themeIdx]);
 });
 
 btnPin.addEventListener('click', async () => {
   st.pinned = !st.pinned;
   btnPin.classList.toggle('pinned', st.pinned);
   await tauriWin()?.setAlwaysOnTop(st.pinned);
+});
+
+btnRecords.addEventListener('click', async () => {
+  await window.__TAURI__?.core?.invoke?.('open_records');
 });
 
 // ── Timer click → edit mode ────────────────────────────────────────────────
@@ -197,19 +205,18 @@ timerEl.addEventListener('click', () => {
 });
 
 timerInputEl.addEventListener('mousedown', (e) => e.stopPropagation());
-
 timerInputEl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); closeEdit(true); }
   if (e.key === 'Escape') closeEdit(false);
 });
-
 timerInputEl.addEventListener('blur', () => closeEdit(true));
 
 // ── Enter key → start / stop ───────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
-  if (timerInputEl.style.display === 'block') return; // editing
+  if (timerInputEl.style.display === 'block') return;
   e.preventDefault();
+  if (st.running) logSession();
   st.running = !st.running;
   setPlayIcon(st.running);
 });
@@ -230,7 +237,6 @@ function renderTaskName() {
 function renderTaskPanel() {
   taskPanelList.innerHTML = '';
 
-  // "なし" item
   const noneEl = document.createElement('div');
   noneEl.className = 'task-item' + (currentTask === '' ? ' active' : '');
   noneEl.textContent = 'なし';
@@ -316,6 +322,20 @@ circle.addEventListener('click', () => {
   if (taskPanel.classList.contains('open')) closeTaskPanel();
 });
 
+// ── Session logging ────────────────────────────────────────────────────────
+let logs = JSON.parse(localStorage.getItem('mt_logs') || '[]');
+
+function logSession() {
+  const duration = Math.floor(st.elapsed);
+  if (duration < 5) return;
+  logs.push({
+    task:      currentTask || '(タスクなし)',
+    duration,
+    timestamp: Date.now(),
+  });
+  localStorage.setItem('mt_logs', JSON.stringify(logs));
+}
+
 // ── Scroll → adjust countdown total (when stopped) ────────────────────────
 circle.addEventListener('wheel', (e) => {
   if (st.running) return;
@@ -327,6 +347,11 @@ circle.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 // ── Init ───────────────────────────────────────────────────────────────────
+const savedTheme = localStorage.getItem('mt_theme') || '';
+document.body.className = savedTheme;
+st.themeIdx = THEMES.indexOf(savedTheme);
+if (st.themeIdx < 0) st.themeIdx = 0;
+
 refreshText();
 renderTaskName();
 requestAnimationFrame(tick);
