@@ -4,36 +4,42 @@ const THEMES = ['', 'light', 'sunset'];
 
 // ── State ──────────────────────────────────────────────────────────────────
 const st = {
-  mode:         'countdown',
-  running:      false,
-  elapsed:      0,
-  total:        25 * 60,
-  themeIdx:     0,
-  pinned:       false,
+  mode: 'countdown',
+  running: false,
+  elapsed: 0,
+  total: 25 * 60,
+  themeIdx: 0,
+  pinned: false,
   sessionStart: null,
+  breakMode: false,
 };
 
+// 休憩モード切替時に退避する値
+let savedTask = '';
+let savedTotal = 25 * 60;
+
 // ── DOM refs ───────────────────────────────────────────────────────────────
-const timerEl      = document.getElementById('timer');
+const timerEl = document.getElementById('timer');
 const timerInputEl = document.getElementById('timer-input');
-const clockEl      = document.getElementById('clock');
-const ringEl       = document.getElementById('ring');
-const circle       = document.getElementById('circle');
-const btnPlay      = document.getElementById('btn-play');
-const btnPause     = document.getElementById('btn-pause');
-const btnReset     = document.getElementById('btn-reset');
-const btnMode      = document.getElementById('btn-mode');
-const btnTheme     = document.getElementById('btn-theme');
-const btnPin       = document.getElementById('btn-pin');
-const btnTask      = document.getElementById('btn-task');
-const btnRecords   = document.getElementById('btn-records');
-const taskNameEl      = document.getElementById('task-name');
-const taskPanel       = document.getElementById('task-panel');
-const taskPanelList   = document.getElementById('task-panel-list');
-const taskPanelInput  = document.getElementById('task-panel-input');
+const clockEl = document.getElementById('clock');
+const ringEl = document.getElementById('ring');
+const circle = document.getElementById('circle');
+const btnPlay = document.getElementById('btn-play');
+const btnPause = document.getElementById('btn-pause');
+const btnReset = document.getElementById('btn-reset');
+const btnMode = document.getElementById('btn-mode');
+const btnTheme = document.getElementById('btn-theme');
+const btnPin = document.getElementById('btn-pin');
+const btnTask = document.getElementById('btn-task');
+const btnRecords = document.getElementById('btn-records');
+const btnBreak = document.getElementById('btn-break');
+const taskNameEl = document.getElementById('task-name');
+const taskPanel = document.getElementById('task-panel');
+const taskPanelList = document.getElementById('task-panel-list');
+const taskPanelInput = document.getElementById('task-panel-input');
 const taskPanelAddBtn = document.getElementById('task-panel-add-btn');
-const iconPlay        = document.getElementById('icon-play');
-const iconPause       = document.getElementById('icon-pause');
+const iconPlay = document.getElementById('icon-play');
+const iconPause = document.getElementById('icon-pause');
 
 // ── Tauri window API ───────────────────────────────────────────────────────
 function tauriWin() {
@@ -73,7 +79,7 @@ function refreshText() {
 const pad = n => String(n).padStart(2, '0');
 
 // ── Tick loop ──────────────────────────────────────────────────────────────
-let lastTime   = performance.now();
+let lastTime = performance.now();
 let lastSecond = -1;
 
 function tick(now) {
@@ -87,6 +93,7 @@ function tick(now) {
       st.running = false;
       setPlayIcon(false);
       logSession();
+      startCompletion();
     }
   }
 
@@ -105,13 +112,87 @@ function tick(now) {
 const iconStop = document.getElementById('icon-stop');
 
 function setPlayIcon(playing) {
-  iconPlay.style.display  = playing ? 'none' : '';
-  iconStop.style.display  = playing ? ''     : 'none';
-  btnPause.style.display  = playing ? ''     : 'none';
+  iconPlay.style.display = playing ? 'none' : '';
+  iconStop.style.display = playing ? '' : 'none';
+  btnPause.style.display = playing ? '' : 'none';
+}
+
+// ── Completion notification ─────────────────────────────────────────────────
+let completionActive = false;
+
+async function startCompletion() {
+  if (completionActive) return;
+  completionActive = true;
+  document.documentElement.classList.add('completion');
+  await window.__TAURI__?.core?.invoke?.('notify_completion');
+}
+
+async function dismissCompletion() {
+  if (!completionActive) return;
+  completionActive = false;
+  document.documentElement.classList.remove('completion');
+  await window.__TAURI__?.core?.invoke?.('dismiss_completion');
+  // ピン留め状態を復元
+  await tauriWin()?.setAlwaysOnTop(st.pinned);
 }
 
 // ── Button handlers ────────────────────────────────────────────────────────
+// ── Break mode ─────────────────────────────────────────────────────────────
+function enterBreak() {
+  if (st.breakMode) return;
+  // 実行中なら作業セッションを記録
+  if (st.running) logSession();
+  // 現在のタスクとタイマー設定を退避
+  savedTask = currentTask;
+  savedTotal = st.total;
+  // 休憩モードに切替
+  st.breakMode = true;
+  currentTask = '休憩';
+  st.mode = 'countdown';
+  st.total = 5 * 60;
+  st.elapsed = 0;
+  st.running = true;
+  st.sessionStart = Date.now();
+  lastSecond = -1;
+  setPlayIcon(true);
+  refreshText();
+  renderTaskName();
+  draw();
+  circle.classList.add('break-mode');
+  btnBreak.classList.add('active');
+}
+
+function exitBreak() {
+  if (!st.breakMode) return;
+  st.breakMode = false;
+  currentTask = savedTask;
+  st.total = savedTotal;
+  renderTaskName();
+  circle.classList.remove('break-mode');
+  btnBreak.classList.remove('active');
+}
+
+btnBreak.addEventListener('click', () => {
+  if (st.breakMode) {
+    // 休憩中にもう一度押したら休憩終了
+    if (st.running) logSession();
+    st.running = false;
+    st.elapsed = 0;
+    st.sessionStart = null;
+    exitBreak();
+    lastSecond = -1;
+    setPlayIcon(false);
+    refreshText();
+    draw();
+  } else {
+    enterBreak();
+  }
+});
+
+// ── Button handlers ────────────────────────────────────────────────────────
 btnPlay.addEventListener('click', () => {
+  dismissCompletion();
+  exitBreak();
   if (st.running) logSession();
   st.running = !st.running;
   if (st.running && st.sessionStart === null) st.sessionStart = Date.now();
@@ -125,6 +206,8 @@ btnPause.addEventListener('click', () => {
 });
 
 btnReset.addEventListener('click', () => {
+  dismissCompletion();
+  exitBreak();
   if (st.running) logSession();
   st.running = false;
   st.elapsed = 0;
@@ -136,8 +219,10 @@ btnReset.addEventListener('click', () => {
 });
 
 btnMode.addEventListener('click', () => {
+  dismissCompletion();
+  exitBreak();
   if (st.running) logSession();
-  st.mode    = st.mode === 'countdown' ? 'countup' : 'countdown';
+  st.mode = st.mode === 'countdown' ? 'countup' : 'countdown';
   st.running = false;
   st.elapsed = 0;
   st.sessionStart = null;
@@ -160,7 +245,32 @@ btnPin.addEventListener('click', async () => {
 });
 
 btnRecords.addEventListener('click', async () => {
+  closeCtxMenu();
   await window.__TAURI__?.core?.invoke?.('open_records');
+});
+
+// ── Records context menu (right-click) ─────────────────────────────
+const ctxMenu = document.getElementById('records-ctx-menu');
+const ctxOpenDevtools = document.getElementById('ctx-open-devtools');
+
+function closeCtxMenu() { ctxMenu.classList.remove('open'); }
+
+btnRecords.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  ctxMenu.classList.toggle('open');
+});
+
+ctxMenu.addEventListener('mousedown', (e) => e.stopPropagation());
+
+ctxOpenDevtools.addEventListener('click', async () => {
+  closeCtxMenu();
+  await window.__TAURI__?.core?.invoke?.('open_records_devtools');
+});
+
+circle.addEventListener('mousedown', () => closeCtxMenu());
+document.addEventListener('click', (e) => {
+  if (!ctxMenu.contains(e.target) && e.target !== btnRecords) closeCtxMenu();
 });
 
 // ── Timer click → edit mode ────────────────────────────────────────────────
@@ -230,6 +340,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   if (timerInputEl.style.display === 'block') return;
   e.preventDefault();
+  if (completionActive) { dismissCompletion(); return; }
   if (st.running) logSession();
   st.running = !st.running;
   if (st.running && st.sessionStart === null) st.sessionStart = Date.now();
@@ -237,7 +348,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ── Task management ────────────────────────────────────────────────────────
-let tasks       = JSON.parse(localStorage.getItem('mt_tasks') || '[]');
+let tasks = JSON.parse(localStorage.getItem('mt_tasks') || '[]');
 let currentTask = localStorage.getItem('mt_current_task') || '';
 
 function saveTaskState() {
@@ -334,6 +445,7 @@ taskPanelAddBtn.addEventListener('click', (e) => {
 });
 
 circle.addEventListener('click', () => {
+  if (completionActive) { dismissCompletion(); return; }
   if (taskPanel.classList.contains('open')) closeTaskPanel();
 });
 
@@ -347,12 +459,13 @@ function logSession() {
   const startedAt = st.sessionStart ?? (endedAt - duration * 1000);
   st.sessionStart = null;
   logs.push({
-    id:        Math.random().toString(36).slice(2),
-    task:      currentTask || '(タスクなし)',
+    id: Math.random().toString(36).slice(2),
+    task: currentTask || '(タスクなし)',
     duration,
     startedAt,
     endedAt,
-    mode:      st.mode,
+    mode: st.mode,
+    isBreak: st.breakMode,
   });
   localStorage.setItem('mt_logs', JSON.stringify(logs));
 }

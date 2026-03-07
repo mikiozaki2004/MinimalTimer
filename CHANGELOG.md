@@ -2,6 +2,36 @@
 
 ---
 
+## 2026-03-07
+
+### やったこと
+
+#### 記録ウィンドウの不具合修正
+- `lib.rs`: ウィンドウが破棄された後に再作成するフォールバック追加、`on_window_event` で close を hide に変換
+- `records.html` / `records.css`: ✕ボタンを `data-tauri-drag-region` の外に移動し、クリックが正しく動作するように修正
+- `records.js`: ✕ボタンの close を `invoke('hide_records')` 経由に変更し、Tauri JS APIの互換性問題を回避
+
+#### 開発者ツール起動の改善
+- `lib.rs`: 記録ウィンドウの devtools 自動オープンを削除、`open_records_devtools` コマンドを新設
+- `index.html` / `style.css` / `main.js`: 記録ボタンの右クリックで「開発者ツールと共に開く」メニューを表示
+
+#### カウントダウン終了通知
+- `lib.rs`: `notify_completion` / `dismiss_completion` コマンドを追加（ウィンドウ拡大→画面中央移動→元に戻す）
+- `style.css`: 2秒周期のフェードイン・アウト点滅アニメーション
+- `main.js`: 終了時に通知開始、クリック/ボタン操作で解除するロジック
+
+#### 休憩モード機能
+- `index.html`: ☕休憩ボタンを追加
+- `main.js`: 休憩モードの状態管理・切替ロジック（5分カウントダウン、ログに `isBreak` フラグ付与）
+- `style.css`: 休憩中はリング色を緑系に変更
+- `records.js` / `records.html` / `records.css`: 作業時間と休憩時間を分離表示、☕マーク付き
+
+### 次回やること
+
+（未記入）
+
+---
+
 ## 2026-03-04（一時停止ボタン実装）
 
 ### やったこと

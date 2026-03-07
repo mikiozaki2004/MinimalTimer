@@ -4,7 +4,7 @@ document.body.className = localStorage.getItem('mt_theme') || '';
 // ── Data ───────────────────────────────────────────────────────────────────
 let logs = JSON.parse(localStorage.getItem('mt_logs') || '[]');
 let period = 'today';
-let view   = 'summary';
+let view = 'summary';
 
 function getFiltered() {
   const now = new Date();
@@ -28,10 +28,14 @@ function getFiltered() {
 
 function getAggregated() {
   const totals = {};
-  getFiltered().forEach(l => {
+  getFiltered().filter(l => !l.isBreak).forEach(l => {
     totals[l.task] = (totals[l.task] || 0) + l.duration;
   });
   return Object.entries(totals).sort((a, b) => b[1] - a[1]);
+}
+
+function getBreakTotal() {
+  return getFiltered().filter(l => l.isBreak).reduce((s, l) => s + l.duration, 0);
 }
 
 function fmtDuration(sec) {
@@ -55,7 +59,7 @@ function fmtDateLabel(ms) {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  if (d.toDateString() === today.toDateString())     return `${ymd}（今日）`;
+  if (d.toDateString() === today.toDateString()) return `${ymd}（今日）`;
   if (d.toDateString() === yesterday.toDateString()) return `${ymd}（昨日）`;
   return ymd;
 }
@@ -76,8 +80,9 @@ function animateCount(el, targetSec) {
 }
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
-const listEl     = document.getElementById('list');
+const listEl = document.getElementById('list');
 const footerTime = document.getElementById('footer-time');
+const footerBreak = document.getElementById('footer-break');
 
 // ── Render: summary ────────────────────────────────────────────────────────
 function renderSummary() {
@@ -93,6 +98,7 @@ function renderSummary() {
     el.textContent = '記録がありません';
     listEl.appendChild(el);
     footerTime.textContent = '—';
+    footerBreak.textContent = '';
     return;
   }
 
@@ -121,6 +127,9 @@ function renderSummary() {
   }, entries.length * 55 + 120);
 
   setTimeout(() => { animateCount(footerTime, grandTotal); }, 200);
+
+  const breakSec = getBreakTotal();
+  footerBreak.textContent = breakSec > 0 ? `休憩 ${fmtDuration(breakSec)}` : '';
 }
 
 // ── Render: session list ───────────────────────────────────────────────────
@@ -138,6 +147,7 @@ function renderList() {
     el.textContent = '記録がありません';
     listEl.appendChild(el);
     footerTime.textContent = '—';
+    footerBreak.textContent = '';
     return;
   }
 
@@ -162,13 +172,13 @@ function renderList() {
     groupEl.appendChild(labelEl);
 
     sessions.forEach(l => {
-      const endMs   = l.endedAt ?? l.timestamp;
+      const endMs = l.endedAt ?? l.timestamp;
       const startMs = l.startedAt ?? (endMs - l.duration * 1000);
       const row = document.createElement('div');
-      row.className = 'session-row';
+      row.className = 'session-row' + (l.isBreak ? ' break' : '');
       row.innerHTML = `
         <span class="session-range">${fmtTime(startMs)} → ${fmtTime(endMs)}</span>
-        <span class="session-task">${l.task}</span>
+        <span class="session-task">${l.isBreak ? '☕ ' : ''}${l.task}</span>
         <span class="session-dur">${fmtDuration(l.duration)}</span>
       `;
       groupEl.appendChild(row);
@@ -177,7 +187,10 @@ function renderList() {
     listEl.appendChild(groupEl);
   });
 
-  footerTime.textContent = fmtDuration(grandTotal);
+  const workTotal = filtered.filter(l => !l.isBreak).reduce((s, l) => s + l.duration, 0);
+  const breakTotal = filtered.filter(l => l.isBreak).reduce((s, l) => s + l.duration, 0);
+  footerTime.textContent = fmtDuration(workTotal);
+  footerBreak.textContent = breakTotal > 0 ? `休憩 ${fmtDuration(breakTotal)}` : '';
 }
 
 // ── Render dispatcher ──────────────────────────────────────────────────────
@@ -231,8 +244,10 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 });
 
 // ── Close ──────────────────────────────────────────────────────────────────
-document.getElementById('close-btn').addEventListener('click', () => {
-  window.__TAURI__?.window?.getCurrentWindow?.().hide();
+const closeBtn = document.getElementById('close-btn');
+closeBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+closeBtn.addEventListener('click', async () => {
+  await window.__TAURI__?.core?.invoke?.('hide_records');
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────
