@@ -37,7 +37,10 @@ fn open_records(app: tauri::AppHandle) {
 #[tauri::command]
 fn open_records_devtools(app: tauri::AppHandle) {
     if let Some(win) = get_or_create_records(&app) {
+        #[cfg(debug_assertions)]
         win.open_devtools();
+        #[cfg(not(debug_assertions))]
+        let _ = win;
     }
 }
 
@@ -52,8 +55,16 @@ fn hide_records(app: tauri::AppHandle) {
 use std::sync::Mutex;
 
 static SAVED_POS: Mutex<Option<(f64, f64)>> = Mutex::new(None);
+static CURRENT_SIZE: Mutex<f64> = Mutex::new(280.0);
 const COMPLETION_SIZE: f64 = 400.0;
-const NORMAL_SIZE: f64 = 280.0;
+
+#[tauri::command]
+fn resize_window(app: tauri::AppHandle, size: u32) {
+    let Some(win) = app.get_webview_window("main") else { return };
+    let size_f = size as f64;
+    *CURRENT_SIZE.lock().unwrap() = size_f;
+    let _ = win.set_size(tauri::LogicalSize::new(size_f, size_f));
+}
 
 #[tauri::command]
 fn notify_completion(app: tauri::AppHandle) {
@@ -91,7 +102,8 @@ fn dismiss_completion(app: tauri::AppHandle) {
     let Some(win) = app.get_webview_window("main") else { return };
 
     // 元のサイズに戻す
-    let _ = win.set_size(tauri::LogicalSize::new(NORMAL_SIZE, NORMAL_SIZE));
+    let current = *CURRENT_SIZE.lock().unwrap();
+    let _ = win.set_size(tauri::LogicalSize::new(current, current));
 
     // 元の位置に戻す
     if let Some((x, y)) = SAVED_POS.lock().unwrap().take() {
@@ -108,6 +120,7 @@ pub fn run() {
             hide_records,
             notify_completion,
             dismiss_completion,
+            resize_window,
         ])
         .on_window_event(|window, event| {
             // records ウィンドウの閉じるイベントを横取りして hide に変換

@@ -29,9 +29,10 @@
       <div class="timer" id="timer">25:00</div>
       <input class="timer-input" id="timer-input" type="text" maxlength="5" placeholder="25:00">
       <div class="task-name" id="task-name"></div>
+      <div class="pomo-status" id="pomo-status"></div>
     </div>
 
-    <!-- Control buttons (hover only) -->
+    <!-- Primary controls (center bottom, hover only) -->
     <div class="controls ctrl-fade">
       <button class="btn" id="btn-play" title="開始 / 停止（記録）">
         <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor">
@@ -52,38 +53,58 @@
             d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
         </svg>
       </button>
-      <button class="btn" id="btn-mode" title="モード切替">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z" />
-        </svg>
-      </button>
-      <button class="btn" id="btn-theme" title="テーマ切替">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path
-            d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
-        </svg>
-      </button>
-      <button class="btn" id="btn-break" title="休憩">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M2 21h18v-2H2v2zM20 8h-2V5h2v3zm0 2H4V5h14v5h2c1.1 0 2 .9 2 2v5h-2v-2H4v2H2v-5c0-1.1.9-2 2-2z" />
-        </svg>
-      </button>
-      <button class="btn" id="btn-task" title="タスク選択">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
-        </svg>
-      </button>
-      <button class="btn" id="btn-records" title="記録">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path
-            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z" />
-        </svg>
-      </button>
     </div>
+
+    <!-- Secondary controls (circle edge, hover only) -->
+    <button class="btn ctrl-fade" id="btn-mode" title="モード切替">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z" />
+      </svg>
+    </button>
+    <button class="btn ctrl-fade" id="btn-theme" title="テーマ切替">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path
+          d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+      </svg>
+    </button>
+    <button class="btn ctrl-fade" id="btn-break" title="休憩">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M2 21h18v-2H2v2zM20 8h-2V5h2v3zm0 2H4V5h14v5h2c1.1 0 2 .9 2 2v5h-2v-2H4v2H2v-5c0-1.1.9-2 2-2z" />
+      </svg>
+    </button>
+    <button class="btn ctrl-fade" id="btn-pomo" title="ポモドーロ">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="7" cy="7" r="3"/><circle cx="17" cy="7" r="3"/>
+        <circle cx="7" cy="17" r="3"/><circle cx="17" cy="17" r="3"/>
+      </svg>
+    </button>
+    <button class="btn ctrl-fade" id="btn-task" title="タスク選択">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
+      </svg>
+    </button>
+    <button class="btn ctrl-fade" id="btn-records" title="記録">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path
+          d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z" />
+      </svg>
+    </button>
 
     <!-- Records context menu -->
     <div class="ctx-menu" id="records-ctx-menu">
       <button class="ctx-menu-item" id="ctx-open-devtools">開発者ツールと共に開く</button>
+    </div>
+
+    <!-- Pomodoro setup panel -->
+    <div class="pomo-panel" id="pomo-panel">
+      <div class="pomo-panel-title">ポモドーロ</div>
+      <div class="pomo-panel-sets">
+        <button class="pomo-sets-btn" id="pomo-sets-dec">−</button>
+        <span class="pomo-sets-count" id="pomo-sets-display">4</span>
+        <span class="pomo-sets-label">セット</span>
+        <button class="pomo-sets-btn" id="pomo-sets-inc">＋</button>
+      </div>
+      <button class="pomo-start-btn" id="pomo-start-btn">開始</button>
     </div>
 
     <!-- Task selector panel -->

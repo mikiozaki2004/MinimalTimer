@@ -14,6 +14,29 @@ const st = {
   breakMode: false,
 };
 
+// ── Window size ────────────────────────────────────────────────────────────
+let currentWindowSize = parseInt(localStorage.getItem('mt_window_size') || '280', 10);
+
+async function applyWindowSize(size) {
+  currentWindowSize = size;
+  const scale = size / 280;
+  document.documentElement.style.width = size + 'px';
+  document.documentElement.style.height = size + 'px';
+  document.body.style.width = size + 'px';
+  document.body.style.height = size + 'px';
+  circle.style.zoom = scale;
+  localStorage.setItem('mt_window_size', size);
+  await window.__TAURI__?.core?.invoke?.('resize_window', { size });
+}
+
+// ポモドーロ状態
+const pomo = {
+  active: false,
+  totalSets: 4,
+  currentSet: 1,
+};
+let pomoSetsCount = 4; // パネル上のステージング値
+
 // 休憩モード切替時に退避する値
 let savedTask = '';
 let savedTotal = 25 * 60;
@@ -33,6 +56,13 @@ const btnPin = document.getElementById('btn-pin');
 const btnTask = document.getElementById('btn-task');
 const btnRecords = document.getElementById('btn-records');
 const btnBreak = document.getElementById('btn-break');
+const btnPomo = document.getElementById('btn-pomo');
+const pomoStatusEl = document.getElementById('pomo-status');
+const pomoPanel = document.getElementById('pomo-panel');
+const pomoSetsDisplay = document.getElementById('pomo-sets-display');
+const pomoSetsDecBtn = document.getElementById('pomo-sets-dec');
+const pomoSetsIncBtn = document.getElementById('pomo-sets-inc');
+const pomoStartBtn = document.getElementById('pomo-start-btn');
 const taskNameEl = document.getElementById('task-name');
 const taskPanel = document.getElementById('task-panel');
 const taskPanelList = document.getElementById('task-panel-list');
@@ -93,7 +123,11 @@ function tick(now) {
       st.running = false;
       setPlayIcon(false);
       logSession();
-      startCompletion();
+      if (pomo.active) {
+        handlePomoTransition();
+      } else {
+        startCompletion();
+      }
     }
   }
 
@@ -123,6 +157,8 @@ let completionActive = false;
 async function startCompletion() {
   if (completionActive) return;
   completionActive = true;
+  // 通知時は zoom をリセット（Rust 側が 400px に拡大するため）
+  circle.style.zoom = '';
   document.documentElement.classList.add('completion');
   await window.__TAURI__?.core?.invoke?.('notify_completion');
 }
@@ -132,8 +168,75 @@ async function dismissCompletion() {
   completionActive = false;
   document.documentElement.classList.remove('completion');
   await window.__TAURI__?.core?.invoke?.('dismiss_completion');
+  // カスタムサイズを復元
+  const scale = currentWindowSize / 280;
+  document.documentElement.style.width = currentWindowSize + 'px';
+  document.documentElement.style.height = currentWindowSize + 'px';
+  document.body.style.width = currentWindowSize + 'px';
+  document.body.style.height = currentWindowSize + 'px';
+  circle.style.zoom = scale;
   // ピン留め状態を復元
   await tauriWin()?.setAlwaysOnTop(st.pinned);
+}
+
+// ── Pomodoro ────────────────────────────────────────────────────────────────
+function renderPomoStatus() {
+  if (!pomo.active) {
+    pomoStatusEl.classList.remove('active');
+    return;
+  }
+  pomoStatusEl.classList.add('active');
+  let html = '';
+  for (let i = 1; i <= pomo.totalSets; i++) {
+    const cls = i < pomo.currentSet ? ' done' : i === pomo.currentSet ? ' current' : '';
+    html += `<span class="pomo-dot${cls}"></span>`;
+  }
+  pomoStatusEl.innerHTML = html;
+}
+
+function handlePomoTransition() {
+  if (!st.breakMode) {
+    // 作業フェーズ終了
+    if (pomo.currentSet >= pomo.totalSets) {
+      // 全セット完了
+      pomo.active = false;
+      renderPomoStatus();
+      btnPomo.classList.remove('active');
+      startCompletion();
+    } else {
+      // 休憩へ
+      enterBreak();
+      renderPomoStatus();
+    }
+  } else {
+    // 休憩フェーズ終了 → 次の作業セットへ
+    exitBreak();
+    pomo.currentSet++;
+    st.total = 25 * 60;
+    st.elapsed = 0;
+    st.running = true;
+    st.sessionStart = Date.now();
+    lastSecond = -1;
+    setPlayIcon(true);
+    draw();
+    renderPomoStatus();
+  }
+}
+
+function exitPomo() {
+  if (!pomo.active) return;
+  pomo.active = false;
+  renderPomoStatus();
+  btnPomo.classList.remove('active');
+}
+
+function openPomoPanel() {
+  pomoSetsDisplay.textContent = pomoSetsCount;
+  pomoPanel.classList.add('open');
+}
+
+function closePomoPanel() {
+  pomoPanel.classList.remove('open');
 }
 
 // ── Button handlers ────────────────────────────────────────────────────────
@@ -189,6 +292,64 @@ btnBreak.addEventListener('click', () => {
   }
 });
 
+// ── Pomodoro button & panel handlers ───────────────────────────────────────
+btnPomo.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (pomo.active) {
+    // ポモドーロ停止
+    if (st.running) logSession();
+    st.running = false;
+    st.elapsed = 0;
+    st.sessionStart = null;
+    lastSecond = -1;
+    setPlayIcon(false);
+    if (st.breakMode) exitBreak();
+    exitPomo();
+    refreshText();
+    draw();
+  } else {
+    closeTaskPanel();
+    pomoPanel.classList.contains('open') ? closePomoPanel() : openPomoPanel();
+  }
+});
+
+pomoSetsDecBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  pomoSetsCount = Math.max(1, pomoSetsCount - 1);
+  pomoSetsDisplay.textContent = pomoSetsCount;
+});
+
+pomoSetsIncBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  pomoSetsCount = Math.min(12, pomoSetsCount + 1);
+  pomoSetsDisplay.textContent = pomoSetsCount;
+});
+
+pomoStartBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  closePomoPanel();
+  if (st.running) logSession();
+  if (st.breakMode) exitBreak();
+  dismissCompletion();
+  // ポモドーロ開始
+  pomo.active = true;
+  pomo.totalSets = pomoSetsCount;
+  pomo.currentSet = 1;
+  st.mode = 'countdown';
+  st.total = 25 * 60;
+  st.elapsed = 0;
+  st.running = true;
+  st.sessionStart = Date.now();
+  lastSecond = -1;
+  setPlayIcon(true);
+  refreshText();
+  draw();
+  renderPomoStatus();
+  btnPomo.classList.add('active');
+});
+
+pomoPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+
 // ── Button handlers ────────────────────────────────────────────────────────
 btnPlay.addEventListener('click', () => {
   dismissCompletion();
@@ -208,6 +369,7 @@ btnPause.addEventListener('click', () => {
 btnReset.addEventListener('click', () => {
   dismissCompletion();
   exitBreak();
+  exitPomo();
   if (st.running) logSession();
   st.running = false;
   st.elapsed = 0;
@@ -221,6 +383,7 @@ btnReset.addEventListener('click', () => {
 btnMode.addEventListener('click', () => {
   dismissCompletion();
   exitBreak();
+  exitPomo();
   if (st.running) logSession();
   st.mode = st.mode === 'countdown' ? 'countup' : 'countdown';
   st.running = false;
@@ -447,6 +610,7 @@ taskPanelAddBtn.addEventListener('click', (e) => {
 circle.addEventListener('click', () => {
   if (completionActive) { dismissCompletion(); return; }
   if (taskPanel.classList.contains('open')) closeTaskPanel();
+  if (pomoPanel.classList.contains('open')) closePomoPanel();
 });
 
 // ── Session logging ────────────────────────────────────────────────────────
@@ -470,10 +634,18 @@ function logSession() {
   localStorage.setItem('mt_logs', JSON.stringify(logs));
 }
 
-// ── Scroll → adjust countdown total (when stopped) ────────────────────────
+// ── Scroll → resize window (Ctrl) or adjust countdown total ───────────────
 circle.addEventListener('wheel', (e) => {
-  if (st.running) return;
   e.preventDefault();
+  if (e.ctrlKey) {
+    // Ctrl+スクロール: ウィンドウリサイズ
+    const delta = e.deltaY > 0 ? -10 : 10;
+    const newSize = Math.max(140, Math.min(560, currentWindowSize + delta));
+    applyWindowSize(newSize);
+    return;
+  }
+  // 通常スクロール: カウントダウン時間調整（停止中のみ）
+  if (st.running) return;
   const delta = e.deltaY > 0 ? 60 : -60;
   st.total = Math.max(60, Math.min(5400, st.total + delta));
   refreshText();
@@ -488,4 +660,6 @@ if (st.themeIdx < 0) st.themeIdx = 0;
 
 refreshText();
 renderTaskName();
+// 保存済みウィンドウサイズを復元
+if (currentWindowSize !== 280) applyWindowSize(currentWindowSize);
 requestAnimationFrame(tick);
