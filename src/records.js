@@ -250,6 +250,12 @@ closeBtn.addEventListener('click', async () => {
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────
+window.refreshRecords = () => {
+  logs = JSON.parse(localStorage.getItem('mt_logs') ?? '[]');
+  document.body.className = localStorage.getItem('mt_theme') ?? '';
+  render();
+};
+
 (async () => {
   await initStorage();
   logs = storageGet('mt_logs', []);

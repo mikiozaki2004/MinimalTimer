@@ -24,7 +24,8 @@
       "Bash(find C:/Users/mikio/AppData/Local/com.minimaltimer.app -name *.json)",
       "Bash(find C:/Users/mikio/AppData/Local/com.minimaltimer.app/EBWebView -name *.json -path '*/Local Storage/*')",
       "Bash(find C:/Users/mikio/AppData/Local/com.minimaltimer.app/EBWebView -name *.leveldb -o -name MANIFEST*)",
-      "Bash(powershell -Command \"Stop-Process -Name ''minimal-timer'' -Force\")"
+      "Bash(powershell -Command \"Stop-Process -Name ''minimal-timer'' -Force\")",
+      "Bash(powershell -Command \"Rename-Item -Path 'C:\\\\dev\\\\MinimalTimer' -NewName 'GoogleTasksDesktopAPP'\")"
     ]
   }
 }

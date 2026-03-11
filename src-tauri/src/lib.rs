@@ -4,6 +4,7 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 fn get_or_create_records(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
     // 既存のウィンドウがあればそれを返す
     if let Some(win) = app.get_webview_window("records") {
+        let _ = win.eval("window.refreshRecords && window.refreshRecords()");
         let _ = win.show();
         let _ = win.set_focus();
         return Some(win);
