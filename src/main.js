@@ -1,3 +1,5 @@
+import { initStorage, storageGet, storageSet } from './store.js';
+
 // ── Constants ──────────────────────────────────────────────────────────────
 const CIRCUMFERENCE = 2 * Math.PI * 126;
 const THEMES = ['', 'light', 'sunset'];
@@ -15,7 +17,7 @@ const st = {
 };
 
 // ── Window size ────────────────────────────────────────────────────────────
-let currentWindowSize = parseInt(localStorage.getItem('mt_window_size') || '280', 10);
+let currentWindowSize = 280;
 
 async function applyWindowSize(size) {
   currentWindowSize = size;
@@ -25,7 +27,7 @@ async function applyWindowSize(size) {
   document.body.style.width = size + 'px';
   document.body.style.height = size + 'px';
   circle.style.zoom = scale;
-  localStorage.setItem('mt_window_size', size);
+  storageSet('mt_window_size', size);
   await window.__TAURI__?.core?.invoke?.('resize_window', { size });
 }
 
@@ -398,7 +400,7 @@ btnMode.addEventListener('click', () => {
 btnTheme.addEventListener('click', () => {
   st.themeIdx = (st.themeIdx + 1) % THEMES.length;
   document.body.className = THEMES[st.themeIdx];
-  localStorage.setItem('mt_theme', THEMES[st.themeIdx]);
+  storageSet('mt_theme', THEMES[st.themeIdx]);
 });
 
 btnPin.addEventListener('click', async () => {
@@ -511,12 +513,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ── Task management ────────────────────────────────────────────────────────
-let tasks = JSON.parse(localStorage.getItem('mt_tasks') || '[]');
-let currentTask = localStorage.getItem('mt_current_task') || '';
+let tasks = [];
+let currentTask = '';
 
 function saveTaskState() {
-  localStorage.setItem('mt_tasks', JSON.stringify(tasks));
-  localStorage.setItem('mt_current_task', currentTask);
+  storageSet('mt_tasks', tasks);
+  storageSet('mt_current_task', currentTask);
 }
 
 function renderTaskName() {
@@ -614,7 +616,7 @@ circle.addEventListener('click', () => {
 });
 
 // ── Session logging ────────────────────────────────────────────────────────
-let logs = JSON.parse(localStorage.getItem('mt_logs') || '[]');
+let logs = [];
 
 function logSession() {
   const duration = Math.floor(st.elapsed);
@@ -631,7 +633,7 @@ function logSession() {
     mode: st.mode,
     isBreak: st.breakMode,
   });
-  localStorage.setItem('mt_logs', JSON.stringify(logs));
+  storageSet('mt_logs', logs);
 }
 
 // ── Scroll → resize window (Ctrl) or adjust countdown total ───────────────
@@ -653,13 +655,22 @@ circle.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 // ── Init ───────────────────────────────────────────────────────────────────
-const savedTheme = localStorage.getItem('mt_theme') || '';
-document.body.className = savedTheme;
-st.themeIdx = THEMES.indexOf(savedTheme);
-if (st.themeIdx < 0) st.themeIdx = 0;
+(async () => {
+  await initStorage();
 
-refreshText();
-renderTaskName();
-// 保存済みウィンドウサイズを復元
-if (currentWindowSize !== 280) applyWindowSize(currentWindowSize);
-requestAnimationFrame(tick);
+  tasks = storageGet('mt_tasks', []);
+  currentTask = storageGet('mt_current_task', '');
+  logs = storageGet('mt_logs', []);
+
+  const savedTheme = storageGet('mt_theme', '');
+  document.body.className = savedTheme;
+  st.themeIdx = THEMES.indexOf(savedTheme);
+  if (st.themeIdx < 0) st.themeIdx = 0;
+
+  currentWindowSize = storageGet('mt_window_size', 280);
+
+  refreshText();
+  renderTaskName();
+  if (currentWindowSize !== 280) applyWindowSize(currentWindowSize);
+  requestAnimationFrame(tick);
+})();

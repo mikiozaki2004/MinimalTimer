@@ -1,8 +1,7 @@
-// ── Theme ──────────────────────────────────────────────────────────────────
-document.body.className = localStorage.getItem('mt_theme') || '';
+import { initStorage, storageGet, storageClear } from './store.js';
 
 // ── Data ───────────────────────────────────────────────────────────────────
-let logs = JSON.parse(localStorage.getItem('mt_logs') || '[]');
+let logs = [];
 let period = 'today';
 let view = 'summary';
 
@@ -229,7 +228,7 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   const btn = document.getElementById('reset-btn');
   if (btn.dataset.confirm === '1') {
     logs = [];
-    localStorage.removeItem('mt_logs');
+    storageClear('mt_logs');
     render();
     btn.textContent = 'リセット';
     delete btn.dataset.confirm;
@@ -251,4 +250,9 @@ closeBtn.addEventListener('click', async () => {
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────
-render();
+(async () => {
+  await initStorage();
+  logs = storageGet('mt_logs', []);
+  document.body.className = storageGet('mt_theme', '');
+  render();
+})();

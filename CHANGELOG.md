@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-03-11
+
+### やったこと
+
+#### サブボタン配置を円の最下部アークに集中
+- `style.css`: 6つのサブボタン（テーマ・モード・休憩・ポモドーロ・タスク・記録）を r=100px で40°〜140° に均等配置し、円の下端に集中するデザインに変更
+
+#### .exe起動時にデータが消える問題を修正
+- 原因: 開発時（`http://localhost:1420`）とリリース時（`http://tauri.localhost`）でlocalStorageのオリジンが異なるため、データが別々に保存されていた
+- 解決: `tauri-plugin-store` を導入し、OSのアプリデータフォルダ（`appdata.json`）に一元保存するよう変更
+- `src-tauri/Cargo.toml`: `tauri-plugin-store = "2"` を追加
+- `src-tauri/src/lib.rs`: プラグインを登録
+- `src/store.js`: 新規作成（ストレージ抽象化ヘルパー）
+- `src/main.js` / `src/records.js`: localStorage 呼び出しをすべて store.js 経由に置き換え、init を async 化
+
+### 次回やること
+
 ## 2026-03-10
 
 ### やったこと

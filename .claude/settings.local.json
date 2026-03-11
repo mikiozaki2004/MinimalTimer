@@ -14,7 +14,11 @@
       "Bash(git init:*)",
       "Bash(git add:*)",
       "Bash(git rm:*)",
-      "Bash(test -f /c/dev/MinimalTimer/CHANGELOG.md)"
+      "Bash(test -f /c/dev/MinimalTimer/CHANGELOG.md)",
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)",
+      "Bash(taskkill /f /im minimal-timer.exe)",
+      "Bash(powershell -Command \"Stop-Process -Name ''''minimal-timer'''' -Force -ErrorAction SilentlyContinue\")"
     ]
   }
 }
