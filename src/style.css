@@ -75,12 +75,22 @@ body {
 .ctrl-fade {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transform: scale(0.75);
+  transition: opacity 0.35s ease, transform 0.35s ease;
 }
 
 .circle:hover .ctrl-fade {
   opacity: 1;
   pointer-events: all;
+  transform: scale(1);
+}
+
+.controls.ctrl-fade {
+  transform: translateX(-50%) scale(0.75);
+}
+
+.circle:hover .controls.ctrl-fade {
+  transform: translateX(-50%) scale(1);
 }
 
 /* ── Center group (slides up on hover) ──────────────────────────── */
@@ -264,6 +274,15 @@ body {
 }
 
 /* ── Pomodoro setup panel ────────────────────────────────────────── */
+@keyframes pomoPanelIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes pomoPanelOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+}
+
 .pomo-panel {
   display: none;
   position: absolute;
@@ -282,6 +301,10 @@ body {
 
 .pomo-panel.open {
   display: block;
+  animation: pomoPanelIn 0.4s ease both;
+}
+.pomo-panel.closing {
+  animation: pomoPanelOut 0.3s ease both;
 }
 
 .pomo-panel-title {
@@ -364,6 +387,15 @@ body {
 }
 
 /* ── Task panel ──────────────────────────────────────────────────── */
+@keyframes taskPanelIn {
+  from { opacity: 0; transform: translate(-50%, -44%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -46%) scale(1); }
+}
+@keyframes taskPanelOut {
+  from { opacity: 1; transform: translate(-50%, -46%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -44%) scale(0.96); }
+}
+
 .task-panel {
   display: none;
   position: absolute;
@@ -381,6 +413,10 @@ body {
 
 .task-panel.open {
   display: block;
+  animation: taskPanelIn 0.4s ease both;
+}
+.task-panel.closing {
+  animation: taskPanelOut 0.3s ease both;
 }
 
 .task-panel-list {
@@ -433,6 +469,77 @@ body {
 
 .task-item-del:hover {
   opacity: 1 !important;
+}
+
+.task-item-toggle {
+  flex-shrink: 0;
+  width: 26px;
+  font-size: 28px;
+  line-height: 1;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+
+.task-item-toggle:hover {
+  opacity: 1;
+}
+
+.task-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-item {
+  padding-left: 8px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.detail-indent {
+  flex-shrink: 0;
+  width: 14px;
+  font-size: 10px;
+  opacity: 0.4;
+}
+
+.detail-add-row {
+  display: flex;
+  align-items: center;
+  padding: 3px 14px 3px 8px;
+  gap: 4px;
+}
+
+.detail-add-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--fg);
+  font-size: 11px;
+  outline: none;
+  padding: 1px 2px;
+}
+
+.detail-add-input::placeholder {
+  opacity: 0.35;
+}
+
+.detail-add-btn {
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.detail-add-btn:hover {
+  opacity: 1;
 }
 
 .task-panel-footer {

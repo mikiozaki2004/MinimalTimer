@@ -27,10 +27,17 @@ function getFiltered() {
 
 function getAggregated() {
   const totals = {};
+  const details = {};
   getFiltered().filter(l => !l.isBreak).forEach(l => {
     totals[l.task] = (totals[l.task] || 0) + l.duration;
+    if (l.detail) {
+      if (!details[l.task]) details[l.task] = {};
+      details[l.task][l.detail] = (details[l.task][l.detail] || 0) + l.duration;
+    }
   });
-  return Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  return Object.entries(totals)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, sec]) => ({ name, sec, details: details[name] || {} }));
 }
 
 function getBreakTotal() {
@@ -103,11 +110,26 @@ function renderSummary() {
 
   const fills = [];
 
-  entries.forEach(([name, sec], i) => {
+  entries.forEach(({ name, sec, details }, i) => {
     const pct = (sec / maxDuration) * 100;
+    const hasDetails = Object.keys(details).length > 0;
     const row = document.createElement('div');
     row.className = 'row';
     row.style.animationDelay = `${i * 55}ms`;
+
+    const detailEntries = Object.entries(details).sort((a, b) => b[1] - a[1]);
+    const detailsHtml = hasDetails ? `
+      <div class="row-details">
+        ${detailEntries.map(([dName, dSec]) => `
+          <div class="row-detail-item">
+            <span class="row-detail-name">${dName}</span>
+            <span class="row-detail-time">${fmtDuration(dSec)}</span>
+            <div class="bar-track bar-track-detail">
+              <div class="bar-fill bar-fill-detail" style="width:${(dSec/sec*100).toFixed(1)}%"></div>
+            </div>
+          </div>`).join('')}
+      </div>` : '';
+
     row.innerHTML = `
       <div class="row-meta">
         <span class="row-name">${name}</span>
@@ -116,6 +138,7 @@ function renderSummary() {
       <div class="bar-track">
         <div class="bar-fill" data-pct="${pct}"></div>
       </div>
+      ${detailsHtml}
     `;
     listEl.appendChild(row);
     fills.push(row.querySelector('.bar-fill'));
@@ -175,9 +198,10 @@ function renderList() {
       const startMs = l.startedAt ?? (endMs - l.duration * 1000);
       const row = document.createElement('div');
       row.className = 'session-row' + (l.isBreak ? ' break' : '');
+      const taskLabel = l.detail ? `${l.task} / ${l.detail}` : l.task;
       row.innerHTML = `
         <span class="session-range">${fmtTime(startMs)} → ${fmtTime(endMs)}</span>
-        <span class="session-task">${l.isBreak ? '☕ ' : ''}${l.task}</span>
+        <span class="session-task">${l.isBreak ? '☕ ' : ''}${taskLabel}</span>
         <span class="session-dur">${fmtDuration(l.duration)}</span>
       `;
       groupEl.appendChild(row);

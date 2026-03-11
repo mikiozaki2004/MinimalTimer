@@ -41,6 +41,7 @@ let pomoSetsCount = 4; // パネル上のステージング値
 
 // 休憩モード切替時に退避する値
 let savedTask = '';
+let savedDetail = '';
 let savedTotal = 25 * 60;
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -238,7 +239,10 @@ function openPomoPanel() {
 }
 
 function closePomoPanel() {
-  pomoPanel.classList.remove('open');
+  pomoPanel.classList.add('closing');
+  pomoPanel.addEventListener('animationend', () => {
+    pomoPanel.classList.remove('open', 'closing');
+  }, { once: true });
 }
 
 // ── Button handlers ────────────────────────────────────────────────────────
@@ -249,6 +253,7 @@ function enterBreak() {
   if (st.running) logSession();
   // 現在のタスクとタイマー設定を退避
   savedTask = currentTask;
+  savedDetail = currentDetail;
   savedTotal = st.total;
   // 休憩モードに切替
   st.breakMode = true;
@@ -271,6 +276,7 @@ function exitBreak() {
   if (!st.breakMode) return;
   st.breakMode = false;
   currentTask = savedTask;
+  currentDetail = savedDetail;
   st.total = savedTotal;
   renderTaskName();
   circle.classList.remove('break-mode');
@@ -515,14 +521,17 @@ document.addEventListener('keydown', (e) => {
 // ── Task management ────────────────────────────────────────────────────────
 let tasks = [];
 let currentTask = '';
+let currentDetail = '';
+let expandedTaskName = null;
 
 function saveTaskState() {
   storageSet('mt_tasks', tasks);
   storageSet('mt_current_task', currentTask);
+  storageSet('mt_current_detail', currentDetail);
 }
 
 function renderTaskName() {
-  taskNameEl.textContent = currentTask;
+  taskNameEl.textContent = currentDetail ? `${currentTask} / ${currentDetail}` : currentTask;
 }
 
 function renderTaskPanel() {
@@ -530,9 +539,10 @@ function renderTaskPanel() {
 
   const noneEl = document.createElement('div');
   noneEl.className = 'task-item' + (currentTask === '' ? ' active' : '');
-  noneEl.textContent = 'なし';
+  noneEl.innerHTML = `<span class="task-item-toggle" style="opacity:0"></span><span class="task-item-name">なし</span>`;
   noneEl.addEventListener('click', () => {
     currentTask = '';
+    currentDetail = '';
     saveTaskState();
     renderTaskName();
     closeTaskPanel();
@@ -540,12 +550,25 @@ function renderTaskPanel() {
   taskPanelList.appendChild(noneEl);
 
   tasks.forEach((task, i) => {
+    const taskName = task.name;
+    const isExpanded = expandedTaskName === taskName;
+    const isActive = currentTask === taskName && currentDetail === '';
+
     const el = document.createElement('div');
-    el.className = 'task-item' + (currentTask === task ? ' active' : '');
+    el.className = 'task-item' + (isActive ? ' active' : '');
+
+    const toggle = document.createElement('span');
+    toggle.className = 'task-item-toggle';
+    toggle.textContent = isExpanded ? '▾' : '▸';
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      expandedTaskName = isExpanded ? null : taskName;
+      renderTaskPanel();
+    });
 
     const nameSpan = document.createElement('span');
-    nameSpan.textContent = task;
-    el.appendChild(nameSpan);
+    nameSpan.className = 'task-item-name';
+    nameSpan.textContent = taskName;
 
     const del = document.createElement('span');
     del.className = 'task-item-del';
@@ -553,20 +576,89 @@ function renderTaskPanel() {
     del.addEventListener('click', (e) => {
       e.stopPropagation();
       tasks.splice(i, 1);
-      if (currentTask === task) currentTask = '';
+      if (currentTask === taskName) { currentTask = ''; currentDetail = ''; }
+      if (expandedTaskName === taskName) expandedTaskName = null;
       saveTaskState();
       renderTaskName();
       renderTaskPanel();
     });
-    el.appendChild(del);
 
+    el.appendChild(toggle);
+    el.appendChild(nameSpan);
+    el.appendChild(del);
     el.addEventListener('click', () => {
-      currentTask = task;
+      currentTask = taskName;
+      currentDetail = '';
       saveTaskState();
       renderTaskName();
       closeTaskPanel();
     });
     taskPanelList.appendChild(el);
+
+    if (isExpanded) {
+      task.details.forEach((detail, j) => {
+        const isDetailActive = currentTask === taskName && currentDetail === detail;
+        const detailEl = document.createElement('div');
+        detailEl.className = 'task-item detail-item' + (isDetailActive ? ' active' : '');
+
+        const indent = document.createElement('span');
+        indent.className = 'detail-indent';
+        indent.textContent = '└';
+
+        const detailName = document.createElement('span');
+        detailName.className = 'task-item-name';
+        detailName.textContent = detail;
+
+        const detailDel = document.createElement('span');
+        detailDel.className = 'task-item-del';
+        detailDel.textContent = '✕';
+        detailDel.addEventListener('click', (e) => {
+          e.stopPropagation();
+          task.details.splice(j, 1);
+          if (currentTask === taskName && currentDetail === detail) currentDetail = '';
+          saveTaskState();
+          renderTaskName();
+          renderTaskPanel();
+        });
+
+        detailEl.appendChild(indent);
+        detailEl.appendChild(detailName);
+        detailEl.appendChild(detailDel);
+        detailEl.addEventListener('click', () => {
+          currentTask = taskName;
+          currentDetail = detail;
+          saveTaskState();
+          renderTaskName();
+          closeTaskPanel();
+        });
+        taskPanelList.appendChild(detailEl);
+      });
+
+      const addRow = document.createElement('div');
+      addRow.className = 'detail-add-row';
+      addRow.innerHTML = `<span class="detail-indent">└</span><input class="detail-add-input" type="text" maxlength="20" placeholder="詳細を追加..."><button class="detail-add-btn">＋</button>`;
+
+      const addInput = addRow.querySelector('.detail-add-input');
+      const addBtn = addRow.querySelector('.detail-add-btn');
+      const addDetail = () => {
+        const name = addInput.value.trim();
+        if (name && !task.details.includes(name)) {
+          task.details.push(name);
+          saveTaskState();
+          renderTaskPanel();
+        }
+        addInput.value = '';
+      };
+      addRow.addEventListener('click', (e) => e.stopPropagation());
+      addInput.addEventListener('mousedown', (e) => e.stopPropagation());
+      addInput.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); addDetail(); }
+        if (e.key === 'Escape') closeTaskPanel();
+      });
+      addBtn.addEventListener('click', (e) => { e.stopPropagation(); addDetail(); });
+      taskPanelList.appendChild(addRow);
+    }
   });
 }
 
@@ -577,14 +669,17 @@ function openTaskPanel() {
 }
 
 function closeTaskPanel() {
-  taskPanel.classList.remove('open');
   taskPanelInput.value = '';
+  taskPanel.classList.add('closing');
+  taskPanel.addEventListener('animationend', () => {
+    taskPanel.classList.remove('open', 'closing');
+  }, { once: true });
 }
 
 function addTask() {
   const name = taskPanelInput.value.trim();
-  if (name && !tasks.includes(name)) {
-    tasks.push(name);
+  if (name && !tasks.some(t => t.name === name)) {
+    tasks.push({ name, details: [] });
     saveTaskState();
     renderTaskPanel();
   }
@@ -597,6 +692,7 @@ btnTask.addEventListener('click', (e) => {
 });
 
 taskPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+taskPanel.addEventListener('wheel', (e) => e.stopPropagation());
 
 taskPanelInput.addEventListener('keydown', (e) => {
   e.stopPropagation();
@@ -627,6 +723,7 @@ function logSession() {
   logs.push({
     id: Math.random().toString(36).slice(2),
     task: currentTask || '(タスクなし)',
+    detail: currentDetail || null,
     duration,
     startedAt,
     endedAt,
@@ -658,8 +755,9 @@ circle.addEventListener('wheel', (e) => {
 (async () => {
   await initStorage();
 
-  tasks = storageGet('mt_tasks', []);
+  tasks = storageGet('mt_tasks', []).map(t => typeof t === 'string' ? { name: t, details: [] } : t);
   currentTask = storageGet('mt_current_task', '');
+  currentDetail = storageGet('mt_current_detail', '');
   logs = storageGet('mt_logs', []);
 
   const savedTheme = storageGet('mt_theme', '');
