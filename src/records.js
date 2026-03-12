@@ -93,8 +93,8 @@ const footerBreak = document.getElementById('footer-break');
 // ── Render: summary ────────────────────────────────────────────────────────
 function renderSummary() {
   const entries = getAggregated();
-  const grandTotal = entries.reduce((s, [, v]) => s + v, 0);
-  const maxDuration = entries[0]?.[1] ?? 1;
+  const grandTotal = entries.reduce((s, { sec }) => s + sec, 0);
+  const maxDuration = entries[0]?.sec ?? 1;
 
   listEl.innerHTML = '';
 
