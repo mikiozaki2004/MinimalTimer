@@ -176,10 +176,22 @@ function setPlayIcon(playing) {
 
 // ── Completion notification ─────────────────────────────────────────────────
 let completionActive = false;
+let completionStartTime = null;
+let completionIntervalId = null;
+
+function updateCompletionDisplay() {
+  const elapsed = Math.floor((Date.now() - completionStartTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  timerEl.textContent = `+${pad(m)}:${pad(s)}`;
+}
 
 async function startCompletion() {
   if (completionActive) return;
   completionActive = true;
+  completionStartTime = Date.now();
+  updateCompletionDisplay();
+  completionIntervalId = setInterval(updateCompletionDisplay, 1000);
   // 通知時は zoom をリセット（Rust 側が 400px に拡大するため）
   circle.style.zoom = '';
   document.documentElement.classList.add('completion');
@@ -189,6 +201,28 @@ async function startCompletion() {
 async function dismissCompletion() {
   if (!completionActive) return;
   completionActive = false;
+
+  // カウントアップを止めて記録
+  if (completionIntervalId !== null) {
+    clearInterval(completionIntervalId);
+    completionIntervalId = null;
+  }
+  const overDuration = Math.floor((Date.now() - completionStartTime) / 1000);
+  if (overDuration >= 5) {
+    logs.push({
+      id: Math.random().toString(36).slice(2),
+      task: currentTask || '(タスクなし)',
+      detail: currentDetail || null,
+      duration: overDuration,
+      startedAt: completionStartTime,
+      endedAt: Date.now(),
+      mode: 'countup',
+      isBreak: false,
+    });
+    storageSet('mt_logs', logs);
+  }
+  completionStartTime = null;
+
   document.documentElement.classList.remove('completion');
   await window.__TAURI__?.core?.invoke?.('dismiss_completion');
   // カスタムサイズを復元
@@ -200,6 +234,9 @@ async function dismissCompletion() {
   circle.style.zoom = scale;
   // ピン留め状態を復元
   await tauriWin()?.setAlwaysOnTop(st.pinned);
+  // タイマー表示を元に戻す
+  refreshText();
+  draw();
 }
 
 // ── Pomodoro ────────────────────────────────────────────────────────────────
