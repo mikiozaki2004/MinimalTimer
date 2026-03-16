@@ -114,8 +114,21 @@ const pad = n => String(n).padStart(2, '0');
 // ── Tick loop ──────────────────────────────────────────────────────────────
 let lastTime = performance.now();
 let lastSecond = -1;
+let tickId = null;
+let clockTickInterval = null;
+
+function startTick() {
+  if (clockTickInterval !== null) {
+    clearInterval(clockTickInterval);
+    clockTickInterval = null;
+  }
+  if (tickId !== null) return;
+  lastTime = performance.now();
+  tickId = requestAnimationFrame(tick);
+}
 
 function tick(now) {
+  tickId = null;
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
@@ -142,7 +155,14 @@ function tick(now) {
     refreshText();
   }
 
-  requestAnimationFrame(tick);
+  if (st.running) {
+    tickId = requestAnimationFrame(tick);
+  } else if (clockTickInterval === null) {
+    // 停止中は rAF を止め、時計表示のみ定期更新
+    clockTickInterval = setInterval(() => {
+      clockEl.textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    }, 30_000);
+  }
 }
 
 // ── Play icon helper ───────────────────────────────────────────────────────
@@ -221,6 +241,7 @@ function handlePomoTransition() {
     st.sessionStart = Date.now();
     lastSecond = -1;
     setPlayIcon(true);
+    startTick();
     draw();
     renderPomoStatus();
   }
@@ -265,6 +286,7 @@ function enterBreak() {
   st.sessionStart = Date.now();
   lastSecond = -1;
   setPlayIcon(true);
+  startTick();
   refreshText();
   renderTaskName();
   draw();
@@ -350,6 +372,7 @@ pomoStartBtn.addEventListener('click', (e) => {
   st.sessionStart = Date.now();
   lastSecond = -1;
   setPlayIcon(true);
+  startTick();
   refreshText();
   draw();
   renderPomoStatus();
@@ -366,6 +389,7 @@ btnPlay.addEventListener('click', () => {
   st.running = !st.running;
   if (st.running && st.sessionStart === null) st.sessionStart = Date.now();
   setPlayIcon(st.running);
+  if (st.running) startTick();
 });
 
 btnPause.addEventListener('click', () => {
@@ -516,6 +540,7 @@ document.addEventListener('keydown', (e) => {
   st.running = !st.running;
   if (st.running && st.sessionStart === null) st.sessionStart = Date.now();
   setPlayIcon(st.running);
+  if (st.running) startTick();
 });
 
 // ── Task management ────────────────────────────────────────────────────────
@@ -770,5 +795,8 @@ circle.addEventListener('wheel', (e) => {
   refreshText();
   renderTaskName();
   if (currentWindowSize !== 280) applyWindowSize(currentWindowSize);
-  requestAnimationFrame(tick);
+  // 停止状態で起動するため rAF は使わず、時計のみ定期更新
+  clockTickInterval = setInterval(() => {
+    clockEl.textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  }, 30_000);
 })();
