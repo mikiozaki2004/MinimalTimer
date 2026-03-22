@@ -231,10 +231,8 @@ body {
   font-size: 12px;
   color: var(--fg);
   opacity: 0.85;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 200px;
+  min-width: 0;
 }
 
 .row-time {
@@ -308,6 +306,36 @@ body {
   opacity: 0.5;
 }
 
+/* ── Clickable row (日別ドリルダウン) ───────────────────────────── */
+.row-clickable {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.row-clickable:hover {
+  opacity: 0.65;
+}
+
+/* ── Back button ─────────────────────────────────────────────────── */
+.back-btn {
+  background: none;
+  border: none;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  color: var(--fg);
+  opacity: 0.45;
+  cursor: pointer;
+  padding: 2px 8px 2px 2px;
+  border-radius: 5px;
+  transition: opacity 0.15s;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.back-btn:hover {
+  opacity: 0.9;
+}
+
 /* ── Empty state ─────────────────────────────────────────────────── */
 .empty {
   font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -329,6 +357,9 @@ body {
 }
 
 .date-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   font-size: 10px;
   color: var(--fg);
@@ -337,6 +368,14 @@ body {
   padding: 8px 0 4px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 2px;
+}
+
+.date-total {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ring);
+  opacity: 1;
+  letter-spacing: 0;
 }
 
 .session-row {
@@ -360,10 +399,9 @@ body {
   font-size: 12px;
   color: var(--fg);
   opacity: 0.85;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+  min-width: 0;
 }
 
 .session-dur {
@@ -467,4 +505,192 @@ body.light .session-row.break .session-dur {
 
 body.sunset .session-row.break .session-dur {
   color: #34D399;
+}
+
+/* ── Footer actions ──────────────────────────────────────────────── */
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.add-btn {
+  background: none;
+  border: 1px solid var(--border);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--fg);
+  opacity: 0.35;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.add-btn:hover {
+  opacity: 0.8;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Add entry form ──────────────────────────────────────────────── */
+.add-form {
+  position: absolute;
+  top: 82px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 20px 22px;
+  gap: 20px;
+  z-index: 20;
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.add-form.hidden {
+  display: none;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.add-form-header {
+  display: flex;
+  align-items: center;
+}
+
+.add-form-title {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: var(--fg);
+  opacity: 0.7;
+}
+
+.add-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.add-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.add-label {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  color: var(--fg);
+  opacity: 0.4;
+  width: 38px;
+  flex-shrink: 0;
+}
+
+.add-input {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  flex: 1;
+}
+
+.add-input:focus {
+  border-color: var(--ring);
+}
+
+.add-duration-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.add-num {
+  flex: 0 0 52px;
+  text-align: center;
+  padding: 6px 6px;
+}
+
+.add-unit {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  color: var(--fg);
+  opacity: 0.35;
+}
+
+.add-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.add-cancel-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  opacity: 0.4;
+  cursor: pointer;
+  padding: 6px 14px;
+  transition: opacity 0.15s;
+}
+
+.add-cancel-btn:hover {
+  opacity: 0.8;
+}
+
+.add-submit-btn {
+  background: var(--ring);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 16px;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.add-submit-btn:hover {
+  opacity: 1;
+}
+
+/* ── Graph ─────────────────────────────────────────────────────────── */
+.graph-wrap {
+  padding: 4px 0;
+  animation: rowIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.graph-svg {
+  display: block;
+  overflow: visible;
+}
+
+.graph-label {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 9px;
+  fill: var(--fg);
+  opacity: 0.4;
 }

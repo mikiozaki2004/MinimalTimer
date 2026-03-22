@@ -13,6 +13,7 @@
     <header class="header" data-tauri-drag-region>
       <span class="header-title">記録</span>
       <div class="tabs">
+        <button class="tab" id="tab-yesterday">昨日</button>
         <button class="tab active" id="tab-today">今日</button>
         <button class="tab" id="tab-week">今週</button>
         <button class="tab" id="tab-month">今月</button>
@@ -30,6 +31,7 @@
       <div class="view-tabs">
         <button class="view-tab active" id="view-summary">集計</button>
         <button class="view-tab" id="view-list">一覧</button>
+        <button class="view-tab" id="view-graph">グラフ</button>
       </div>
     </div>
 
@@ -43,8 +45,41 @@
         <span class="footer-time" id="footer-time">—</span>
         <span class="footer-break" id="footer-break"></span>
       </div>
-      <button class="reset-btn" id="reset-btn">リセット</button>
+      <div class="footer-actions">
+        <button class="add-btn" id="add-btn" title="作業を追加">＋</button>
+        <button class="reset-btn" id="reset-btn">リセット</button>
+      </div>
     </footer>
+
+    <div class="add-form hidden" id="add-form">
+      <div class="add-form-header">
+        <span class="add-form-title">作業を追加</span>
+      </div>
+      <div class="add-form-fields">
+        <div class="add-field">
+          <label class="add-label">日付</label>
+          <input type="date" id="add-date" class="add-input">
+        </div>
+        <div class="add-field">
+          <label class="add-label">時間</label>
+          <div class="add-duration-wrap">
+            <input type="number" id="add-hours" class="add-input add-num" min="0" max="23" value="0">
+            <span class="add-unit">h</span>
+            <input type="number" id="add-minutes" class="add-input add-num" min="0" max="59" value="30">
+            <span class="add-unit">m</span>
+          </div>
+        </div>
+        <div class="add-field">
+          <label class="add-label">タスク</label>
+          <input type="text" id="add-task" class="add-input" list="add-task-list" placeholder="タスク名">
+          <datalist id="add-task-list"></datalist>
+        </div>
+      </div>
+      <div class="add-form-actions">
+        <button class="add-cancel-btn" id="add-cancel-btn">キャンセル</button>
+        <button class="add-submit-btn" id="add-submit-btn">追加する</button>
+      </div>
+    </div>
 
   </div>
   <script src="records.js" type="module"></script>
