@@ -615,24 +615,22 @@ body.sunset .session-row.break .session-dur {
   border-color: var(--ring);
 }
 
-.add-duration-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
+.add-time {
+  flex: 0 0 100px;
+  color-scheme: dark;
 }
 
-.add-num {
-  flex: 0 0 52px;
-  text-align: center;
-  padding: 6px 6px;
+body.light .add-time {
+  color-scheme: light;
 }
 
-.add-unit {
+.add-duration-preview {
   font-family: 'Helvetica Neue', Arial, sans-serif;
-  font-size: 11px;
-  color: var(--fg);
-  opacity: 0.35;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 42px;
+  text-align: right;
 }
 
 .add-form-actions {

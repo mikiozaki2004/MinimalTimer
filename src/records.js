@@ -37,24 +37,6 @@ function getFiltered() {
   return logs.filter(l => (l.endedAt ?? l.timestamp) >= startMs);
 }
 
-function getMonthDailyTotals() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const days = {};
-  logs
-    .filter(l => !l.isBreak && (l.endedAt ?? l.timestamp) >= monthStart)
-    .forEach(l => {
-      const d = new Date(l.endedAt ?? l.timestamp);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      days[key] = (days[key] || 0) + l.duration;
-    });
-  return Object.entries(days)
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([key, sec]) => {
-      const [y, m, d] = key.split('-').map(Number);
-      return { key, label: fmtDateLabel(new Date(y, m - 1, d).getTime()), sec };
-    });
-}
 
 function getMonthly() {
   const months = {};
@@ -145,57 +127,8 @@ const listEl = document.getElementById('list');
 const footerTime = document.getElementById('footer-time');
 const footerBreak = document.getElementById('footer-break');
 
-// ── Render: daily summary (今月ドリルダウン用) ─────────────────────────────
-function renderDailySummary() {
-  const entries = getMonthDailyTotals();
-  const grandTotal = entries.reduce((s, { sec }) => s + sec, 0);
-  const maxSec = entries[0]?.sec ?? 1;
-
-  listEl.innerHTML = '';
-
-  if (entries.length === 0) {
-    const el = document.createElement('div');
-    el.className = 'empty';
-    el.textContent = '記録がありません';
-    listEl.appendChild(el);
-    footerTime.textContent = '—';
-    footerBreak.textContent = '';
-    return;
-  }
-
-  const fills = [];
-
-  entries.forEach(({ key, label, sec }, i) => {
-    const pct = (sec / maxSec) * 100;
-    const row = document.createElement('div');
-    row.className = 'row row-clickable';
-    row.style.animationDelay = `${i * 55}ms`;
-    row.innerHTML = `
-      <div class="row-meta">
-        <span class="row-name">${label}</span>
-        <span class="row-time">${fmtDuration(sec)}</span>
-      </div>
-      <div class="bar-track">
-        <div class="bar-fill" data-pct="${pct}"></div>
-      </div>
-    `;
-    row.addEventListener('click', () => { selectedDate = key; render(); });
-    listEl.appendChild(row);
-    fills.push(row.querySelector('.bar-fill'));
-  });
-
-  setTimeout(() => {
-    fills.forEach(el => { el.style.width = el.dataset.pct + '%'; });
-  }, entries.length * 55 + 120);
-
-  setTimeout(() => { animateCount(footerTime, grandTotal); }, 200);
-  footerBreak.textContent = '';
-}
-
 // ── Render: summary ────────────────────────────────────────────────────────
 function renderSummary() {
-  if (period === 'all') { renderMonthlySummary(); return; }
-  if (period === 'month' && !selectedDate) { renderDailySummary(); return; }
 
   const entries = getAggregated();
   const grandTotal = entries.reduce((s, { sec }) => s + sec, 0);
@@ -257,52 +190,6 @@ function renderSummary() {
 
   const breakSec = getBreakTotal();
   footerBreak.textContent = breakSec > 0 ? `休憩 ${fmtDuration(breakSec)}` : '';
-}
-
-// ── Render: monthly summary (全期間) ───────────────────────────────────────
-function renderMonthlySummary() {
-  const entries = getMonthly();
-  const grandTotal = entries.reduce((s, { sec }) => s + sec, 0);
-  const maxSec = entries[0]?.sec ?? 1;
-
-  listEl.innerHTML = '';
-
-  if (entries.length === 0) {
-    const el = document.createElement('div');
-    el.className = 'empty';
-    el.textContent = '記録がありません';
-    listEl.appendChild(el);
-    footerTime.textContent = '—';
-    footerBreak.textContent = '';
-    return;
-  }
-
-  const fills = [];
-
-  entries.forEach(({ label, sec }, i) => {
-    const pct = (sec / maxSec) * 100;
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.style.animationDelay = `${i * 55}ms`;
-    row.innerHTML = `
-      <div class="row-meta">
-        <span class="row-name">${label}</span>
-        <span class="row-time">${fmtDuration(sec)}</span>
-      </div>
-      <div class="bar-track">
-        <div class="bar-fill" data-pct="${pct}"></div>
-      </div>
-    `;
-    listEl.appendChild(row);
-    fills.push(row.querySelector('.bar-fill'));
-  });
-
-  setTimeout(() => {
-    fills.forEach(el => { el.style.width = el.dataset.pct + '%'; });
-  }, entries.length * 55 + 120);
-
-  setTimeout(() => { animateCount(footerTime, grandTotal); }, 200);
-  footerBreak.textContent = '';
 }
 
 // ── Render: session list ───────────────────────────────────────────────────
@@ -574,11 +461,15 @@ function openAddForm() {
   tasks.forEach(t => { const o = document.createElement('option'); o.value = t; datalist.appendChild(o); });
 
   // Reset fields
-  document.getElementById('add-hours').value = '0';
-  document.getElementById('add-minutes').value = '30';
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('add-end').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const startH = now.getHours() - 1 < 0 ? 0 : now.getHours() - 1;
+  document.getElementById('add-start').value = `${pad(startH)}:${pad(now.getMinutes())}`;
   document.getElementById('add-task').value = tasks[0] || '';
 
   document.getElementById('add-form').classList.remove('hidden');
+  updateDurationPreview();
   document.getElementById('add-task').focus();
 }
 
@@ -588,22 +479,27 @@ function closeAddForm() {
 
 async function submitAddForm() {
   const dateStr = document.getElementById('add-date').value;
-  const hours = Math.max(0, parseInt(document.getElementById('add-hours').value) || 0);
-  const minutes = Math.max(0, Math.min(59, parseInt(document.getElementById('add-minutes').value) || 0));
+  const startStr = document.getElementById('add-start').value;
+  const endStr = document.getElementById('add-end').value;
   const task = document.getElementById('add-task').value.trim();
 
-  if (!dateStr || (hours === 0 && minutes === 0) || !task) return;
+  if (!dateStr || !startStr || !endStr || !task) return;
 
-  const durationSec = hours * 3600 + minutes * 60;
   const [y, m, d] = dateStr.split('-').map(Number);
-  const endMs = new Date(y, m - 1, d, 12, 0, 0).getTime();
+  const [sh, sm] = startStr.split(':').map(Number);
+  const [eh, em] = endStr.split(':').map(Number);
+  const startMs = new Date(y, m - 1, d, sh, sm, 0).getTime();
+  const endMs = new Date(y, m - 1, d, eh, em, 0).getTime();
+  const durationSec = Math.round((endMs - startMs) / 1000);
+
+  if (durationSec <= 0) return;
 
   logs.push({
     task,
     duration: durationSec,
     timestamp: endMs,
     endedAt: endMs,
-    startedAt: endMs - durationSec * 1000,
+    startedAt: startMs,
     isManual: true,
   });
   await storageSet('mt_logs', logs);
@@ -611,6 +507,22 @@ async function submitAddForm() {
   closeAddForm();
   render();
 }
+
+function updateDurationPreview() {
+  const startStr = document.getElementById('add-start').value;
+  const endStr = document.getElementById('add-end').value;
+  const preview = document.getElementById('add-duration-preview');
+  if (!startStr || !endStr) { preview.textContent = ''; return; }
+  const [sh, sm] = startStr.split(':').map(Number);
+  const [eh, em] = endStr.split(':').map(Number);
+  const sec = (eh * 60 + em - (sh * 60 + sm)) * 60;
+  preview.textContent = sec > 0 ? fmtDuration(sec) : '—';
+  preview.style.color = sec > 0 ? 'var(--ring)' : 'var(--fg)';
+  preview.style.opacity = sec > 0 ? '1' : '0.3';
+}
+
+document.getElementById('add-start').addEventListener('input', updateDurationPreview);
+document.getElementById('add-end').addEventListener('input', updateDurationPreview);
 
 document.getElementById('add-btn').addEventListener('click', openAddForm);
 document.getElementById('add-cancel-btn').addEventListener('click', closeAddForm);

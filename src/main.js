@@ -795,6 +795,11 @@ function logSession() {
   storageSet('mt_logs', logs);
 }
 
+// ── Save session on exit ───────────────────────────────────────────────────
+window.__saveSessionOnExit = () => {
+  if (st.running) logSession();
+};
+
 // ── Scroll → resize window (Ctrl) or adjust countdown total ───────────────
 circle.addEventListener('wheel', (e) => {
   e.preventDefault();

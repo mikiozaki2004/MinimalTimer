@@ -61,13 +61,13 @@
           <input type="date" id="add-date" class="add-input">
         </div>
         <div class="add-field">
-          <label class="add-label">時間</label>
-          <div class="add-duration-wrap">
-            <input type="number" id="add-hours" class="add-input add-num" min="0" max="23" value="0">
-            <span class="add-unit">h</span>
-            <input type="number" id="add-minutes" class="add-input add-num" min="0" max="59" value="30">
-            <span class="add-unit">m</span>
-          </div>
+          <label class="add-label">開始</label>
+          <input type="time" id="add-start" class="add-input add-time">
+        </div>
+        <div class="add-field">
+          <label class="add-label">終了</label>
+          <input type="time" id="add-end" class="add-input add-time">
+          <span class="add-duration-preview" id="add-duration-preview"></span>
         </div>
         <div class="add-field">
           <label class="add-label">タスク</label>

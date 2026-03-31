@@ -125,11 +125,20 @@ pub fn run() {
             resize_window,
         ])
         .on_window_event(|window, event| {
-            // records ウィンドウの閉じるイベントを横取りして hide に変換
-            if window.label() == "records" {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "records" {
+                    // records ウィンドウの閉じるイベントを横取りして hide に変換
                     api.prevent_close();
                     let _ = window.hide();
+                } else if window.label() == "main" {
+                    // JS側でセッション保存してから終了
+                    api.prevent_close();
+                    let _ = window.eval("window.__saveSessionOnExit && window.__saveSessionOnExit()");
+                    let app = window.app_handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                        app.exit(0);
+                    });
                 }
             }
         })
