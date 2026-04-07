@@ -504,14 +504,34 @@ ctxOpenDevtools.addEventListener('click', async () => {
 const ctxSheetsSetup = document.getElementById('ctx-sheets-setup');
 const sheetsPanel = document.getElementById('sheets-panel');
 const sheetsUrlInput = document.getElementById('sheets-url-input');
+const excelPathInput = document.getElementById('excel-path-input');
 const sheetsPanelStatus = document.getElementById('sheets-panel-status');
 const sheetsCancelBtn = document.getElementById('sheets-cancel-btn');
 const sheetsSaveBtn = document.getElementById('sheets-save-btn');
 
+function normalizeExcelPath(path) {
+  return path.trim().replace(/^["'“”]+|["'“”]+$/g, '');
+}
+
+function saveIntegrationSettings({ showStatus = true } = {}) {
+  const url = sheetsUrlInput.value.trim();
+  const excelPath = normalizeExcelPath(excelPathInput.value);
+  sheetsUrlInput.value = url;
+  excelPathInput.value = excelPath;
+  storageSet('mt_sheets_url', url);
+  storageSet('mt_excel_path', excelPath);
+  if (showStatus) {
+    sheetsPanelStatus.textContent = (url || excelPath) ? '保存しました' : '設定を削除しました';
+  }
+  return { url, excelPath };
+}
+
 function openSheetsPanel() {
   // Keep the legacy storage key so existing Google Sheets setups stay configured.
   sheetsUrlInput.value = storageGet('mt_sheets_url', '');
-  sheetsPanelStatus.textContent = storageGet('mt_sheets_url', '') ? '設定済み' : '';
+  excelPathInput.value = storageGet('mt_excel_path', '');
+  const hasIntegration = storageGet('mt_sheets_url', '') || storageGet('mt_excel_path', '');
+  sheetsPanelStatus.textContent = hasIntegration ? '設定済み' : '';
   sheetsPanel.classList.add('open');
   sheetsUrlInput.focus();
   sheetsUrlInput.select();
@@ -532,14 +552,18 @@ ctxSheetsSetup.addEventListener('click', () => {
 sheetsCancelBtn.addEventListener('click', () => closeSheetsPanel());
 
 sheetsSaveBtn.addEventListener('click', () => {
-  const url = sheetsUrlInput.value.trim();
-  storageSet('mt_sheets_url', url);
-  sheetsPanelStatus.textContent = url ? '保存しました' : '設定を削除しました';
+  saveIntegrationSettings();
   setTimeout(() => closeSheetsPanel(), 800);
 });
 
 sheetsUrlInput.addEventListener('mousedown', (e) => e.stopPropagation());
+excelPathInput.addEventListener('mousedown', (e) => e.stopPropagation());
 sheetsUrlInput.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { e.preventDefault(); sheetsSaveBtn.click(); }
+  if (e.key === 'Escape') closeSheetsPanel();
+});
+excelPathInput.addEventListener('keydown', (e) => {
   e.stopPropagation();
   if (e.key === 'Enter') { e.preventDefault(); sheetsSaveBtn.click(); }
   if (e.key === 'Escape') closeSheetsPanel();
@@ -547,16 +571,20 @@ sheetsUrlInput.addEventListener('keydown', (e) => {
 sheetsPanel.addEventListener('mousedown', (e) => e.stopPropagation());
 
 const sheetsBulkBtn = document.getElementById('sheets-bulk-btn');
+const excelBulkBtn = document.getElementById('excel-bulk-btn');
 
 function sessionToIntegrationRecord(session) {
+  const duration = Number(session.duration ?? 0);
+  const endedAt = session.endedAt ?? session.timestamp ?? Date.now();
+  const startedAt = session.startedAt ?? (endedAt - duration * 1000);
   return {
-    date: new Date(session.startedAt).toLocaleDateString('ja-JP'),
-    task: session.task,
+    date: new Date(startedAt).toLocaleDateString('ja-JP'),
+    task: session.task || '(タスクなし)',
     detail: session.detail || '',
-    startTime: new Date(session.startedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-    endTime: new Date(session.endedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-    durationMin: Math.round(session.duration / 60 * 10) / 10,
-    isBreak: session.isBreak,
+    startTime: new Date(startedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+    endTime: new Date(endedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+    durationMin: Math.round(duration / 60 * 10) / 10,
+    isBreak: Boolean(session.isBreak),
   };
 }
 
@@ -564,7 +592,26 @@ async function postIntegrationRecords(url, records) {
   await fetch(url, { method: 'POST', body: JSON.stringify(records) });
 }
 
+async function appendIntegrationRecordsToExcel(records) {
+  const workbookPath = normalizeExcelPath(storageGet('mt_excel_path', ''));
+  if (!workbookPath) return 0;
+  storageSet('mt_excel_path', workbookPath);
+  return await window.__TAURI__?.core?.invoke?.('append_excel_records', { workbookPath, records });
+}
+
+async function syncSessionIntegrations(session) {
+  const jobs = [];
+  if (storageGet('mt_sheets_url', '')) {
+    jobs.push(syncToIntegrationUrl(session));
+  }
+  if (storageGet('mt_excel_path', '')) {
+    jobs.push(syncToLocalExcel(session));
+  }
+  await Promise.allSettled(jobs);
+}
+
 sheetsBulkBtn.addEventListener('click', async () => {
+  saveIntegrationSettings({ showStatus: false });
   const url = storageGet('mt_sheets_url', '');
   if (!url) {
     sheetsPanelStatus.textContent = '先に URL を保存してください';
@@ -586,7 +633,33 @@ sheetsBulkBtn.addEventListener('click', async () => {
     sheetsPanelStatus.textContent = '送信に失敗しました';
   }
   sheetsBulkBtn.classList.remove('sending');
-  sheetsBulkBtn.textContent = '過去の記録を送信';
+  sheetsBulkBtn.textContent = 'URLへ過去の記録を送信';
+});
+
+excelBulkBtn.addEventListener('click', async () => {
+  const { excelPath } = saveIntegrationSettings({ showStatus: false });
+  const workbookPath = storageGet('mt_excel_path', '');
+  if (!workbookPath || !excelPath) {
+    sheetsPanelStatus.textContent = '先に Excel パスを保存してください';
+    return;
+  }
+  const allLogs = storageGet('mt_logs', []);
+  if (allLogs.length === 0) {
+    sheetsPanelStatus.textContent = '追記する記録がありません';
+    return;
+  }
+  excelBulkBtn.classList.add('sending');
+  excelBulkBtn.innerHTML = `追記中<span class="sheets-sending-dots"><span></span><span></span><span></span></span>`;
+  sheetsPanelStatus.textContent = `${allLogs.length}件`;
+  const body = allLogs.map(sessionToIntegrationRecord);
+  try {
+    await appendIntegrationRecordsToExcel(body);
+    sheetsPanelStatus.textContent = `✓ ${allLogs.length}件 追記しました`;
+  } catch (err) {
+    sheetsPanelStatus.textContent = `追記に失敗しました: ${String(err)}`;
+  }
+  excelBulkBtn.classList.remove('sending');
+  excelBulkBtn.textContent = 'Excelへ過去の記録を追記';
 });
 
 circle.addEventListener('mousedown', () => closeCtxMenu());
@@ -873,9 +946,9 @@ circle.addEventListener('click', () => {
 // ── Session logging ────────────────────────────────────────────────────────
 let logs = [];
 
-function logSession() {
+function logSession({ sync = true } = {}) {
   const duration = Math.floor(st.elapsed);
-  if (duration < 5) return;
+  if (duration < 5) return null;
   const endedAt = Date.now();
   const startedAt = st.sessionStart ?? (endedAt - duration * 1000);
   st.sessionStart = null;
@@ -891,7 +964,8 @@ function logSession() {
   };
   logs.push(session);
   storageSet('mt_logs', logs);
-  syncToIntegrationUrl(session);
+  if (sync) syncSessionIntegrations(session);
+  return session;
 }
 
 // ── Excel / Google Sheets sync ─────────────────────────────────────────────
@@ -905,9 +979,20 @@ async function syncToIntegrationUrl(session) {
   }
 }
 
+async function syncToLocalExcel(session) {
+  try {
+    await appendIntegrationRecordsToExcel([sessionToIntegrationRecord(session)]);
+  } catch (_) {
+    // Excel追記エラーは無視（アプリの動作を止めない）
+  }
+}
+
 // ── Save session on exit ───────────────────────────────────────────────────
 window.__saveSessionOnExit = async () => {
-  if (st.running) logSession();
+  if (st.running) {
+    const session = logSession({ sync: false });
+    if (session) await syncSessionIntegrations(session);
+  }
   const pos = await window.__TAURI__?.core?.invoke?.('get_window_position');
   if (pos) storageSet('mt_window_pos', pos);
 };

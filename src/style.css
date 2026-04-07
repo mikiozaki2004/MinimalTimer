@@ -855,7 +855,7 @@ body.sunset .circle.break-mode {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 210px;
+  width: 230px;
   background: var(--bg);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
@@ -892,6 +892,16 @@ body.sunset .circle.break-mode {
   opacity: 0.4;
   margin-bottom: 10px;
   line-height: 1.4;
+  transition: color 0.4s ease;
+}
+
+.sheets-panel-label {
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 9px;
+  color: var(--fg);
+  opacity: 0.45;
+  text-align: left;
+  margin: 8px 0 4px;
   transition: color 0.4s ease;
 }
 

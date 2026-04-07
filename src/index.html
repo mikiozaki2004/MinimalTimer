@@ -99,14 +99,18 @@
     <!-- Excel / Google Sheets setup panel -->
     <div class="sheets-panel" id="sheets-panel">
       <div class="sheets-panel-title">Excel / Sheets</div>
-      <div class="sheets-panel-desc">Power Automate または GAS の URL を貼り付けてください</div>
+      <div class="sheets-panel-desc">URL または Google Drive 同期フォルダ内の Excel パスを設定できます</div>
+      <div class="sheets-panel-label">URL連携</div>
       <input class="sheets-url-input" id="sheets-url-input" type="text" placeholder="https://...">
+      <div class="sheets-panel-label">ローカルExcel</div>
+      <input class="sheets-url-input" id="excel-path-input" type="text" placeholder="G:\マイドライブ\MinimalTimer_WorkLogs.xlsx">
       <div class="sheets-panel-status" id="sheets-panel-status"></div>
       <div class="sheets-panel-actions">
         <button class="sheets-cancel-btn" id="sheets-cancel-btn">キャンセル</button>
         <button class="sheets-save-btn" id="sheets-save-btn">保存</button>
       </div>
-      <button class="sheets-bulk-btn" id="sheets-bulk-btn">過去の記録を送信</button>
+      <button class="sheets-bulk-btn" id="sheets-bulk-btn">URLへ過去の記録を送信</button>
+      <button class="sheets-bulk-btn" id="excel-bulk-btn">Excelへ過去の記録を追記</button>
     </div>
 
     <!-- Pomodoro setup panel -->
