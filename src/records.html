@@ -10,47 +10,55 @@
 <body>
   <div class="card" data-tauri-drag-region>
 
+    <!-- ヘッダー: 月ナビ + 月計 + 閉じるボタン -->
     <header class="header" data-tauri-drag-region>
-      <span class="header-title">記録</span>
-      <div class="tabs">
-        <button class="tab" id="tab-yesterday">昨日</button>
-        <button class="tab active" id="tab-today">今日</button>
-        <button class="tab" id="tab-week">今週</button>
-        <button class="tab" id="tab-month">今月</button>
-        <button class="tab" id="tab-all">全期間</button>
+      <button class="nav-btn" id="prev-month-btn" title="前月">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+        </svg>
+      </button>
+      <div class="header-center">
+        <span class="header-month" id="header-month"></span>
+        <span class="header-total" id="header-total"></span>
       </div>
+      <button class="nav-btn" id="next-month-btn" title="次月">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+        </svg>
+      </button>
+      <button class="close-btn" id="close-btn" title="閉じる">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </button>
     </header>
-    <button class="close-btn" id="close-btn" title="閉じる">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-        <path
-          d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-      </svg>
-    </button>
 
-    <div class="subheader">
-      <div class="view-tabs">
-        <button class="view-tab active" id="view-summary">集計</button>
-        <button class="view-tab" id="view-list">一覧</button>
-        <button class="view-tab" id="view-graph">グラフ</button>
+    <!-- カレンダー -->
+    <div class="calendar-section">
+      <div class="weekday-row">
+        <span class="weekday">月</span>
+        <span class="weekday">火</span>
+        <span class="weekday">水</span>
+        <span class="weekday">木</span>
+        <span class="weekday">金</span>
+        <span class="weekday sat">土</span>
+        <span class="weekday sun">日</span>
+      </div>
+      <div class="calendar-grid" id="calendar-grid"></div>
+    </div>
+
+    <!-- 日別詳細 -->
+    <div class="day-detail">
+      <div class="day-detail-header" id="day-detail-header"></div>
+      <div class="task-bars" id="task-bars"></div>
+      <div class="detail-sep hidden" id="detail-sep"></div>
+      <div class="session-list-wrap">
+        <div class="session-list" id="session-list"></div>
+        <button class="add-inline-btn" id="add-inline-btn">+ 作業を追加</button>
       </div>
     </div>
 
-    <div class="list-wrap">
-      <div class="list" id="list"></div>
-    </div>
-
-    <footer class="footer">
-      <div class="footer-total">
-        <span class="footer-label">作業</span>
-        <span class="footer-time" id="footer-time">—</span>
-        <span class="footer-break" id="footer-break"></span>
-      </div>
-      <div class="footer-actions">
-        <button class="add-btn" id="add-btn" title="作業を追加">＋</button>
-        <button class="reset-btn" id="reset-btn">リセット</button>
-      </div>
-    </footer>
-
+    <!-- 手動追加フォーム -->
     <div class="add-form hidden" id="add-form">
       <div class="add-form-header">
         <span class="add-form-title">作業を追加</span>

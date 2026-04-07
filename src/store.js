@@ -2,7 +2,7 @@
 const _cache = {};
 
 export async function initStorage() {
-  const KEYS = ['mt_window_size', 'mt_theme', 'mt_tasks', 'mt_current_task', 'mt_logs'];
+  const KEYS = ['mt_window_size', 'mt_theme', 'mt_tasks', 'mt_current_task', 'mt_logs', 'mt_sheets_url'];
   for (const key of KEYS) {
     const raw = localStorage.getItem(key);
     if (raw !== null) {

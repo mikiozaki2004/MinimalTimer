@@ -27,7 +27,7 @@
     <div class="center-group" id="center-group">
       <div class="clock" id="clock"></div>
       <div class="timer" id="timer">25:00</div>
-      <input class="timer-input" id="timer-input" type="text" maxlength="5" placeholder="25:00">
+      <input class="timer-input" id="timer-input" type="text" maxlength="8" placeholder="25:00">
       <div class="task-name" id="task-name"></div>
       <div class="pomo-status" id="pomo-status"></div>
     </div>
@@ -92,7 +92,21 @@
 
     <!-- Records context menu -->
     <div class="ctx-menu" id="records-ctx-menu">
+      <button class="ctx-menu-item" id="ctx-sheets-setup">Excel / Sheets 連携</button>
       <button class="ctx-menu-item" id="ctx-open-devtools">開発者ツールと共に開く</button>
+    </div>
+
+    <!-- Excel / Google Sheets setup panel -->
+    <div class="sheets-panel" id="sheets-panel">
+      <div class="sheets-panel-title">Excel / Sheets</div>
+      <div class="sheets-panel-desc">Power Automate または GAS の URL を貼り付けてください</div>
+      <input class="sheets-url-input" id="sheets-url-input" type="text" placeholder="https://...">
+      <div class="sheets-panel-status" id="sheets-panel-status"></div>
+      <div class="sheets-panel-actions">
+        <button class="sheets-cancel-btn" id="sheets-cancel-btn">キャンセル</button>
+        <button class="sheets-save-btn" id="sheets-save-btn">保存</button>
+      </div>
+      <button class="sheets-bulk-btn" id="sheets-bulk-btn">過去の記録を送信</button>
     </div>
 
     <!-- Pomodoro setup panel -->

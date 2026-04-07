@@ -810,6 +810,172 @@ body.sunset .circle.break-mode {
   background: rgba(255, 255, 255, 0.10);
 }
 
+/* ── Excel / Google Sheets setup panel ───────────────────────────── */
+@keyframes sheetsDot {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40%           { opacity: 1;   transform: scale(1); }
+}
+
+.sheets-bulk-btn.sending {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
+.sheets-sending-dots {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.sheets-sending-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fg);
+  animation: sheetsDot 1.2s ease-in-out infinite;
+}
+
+.sheets-sending-dots span:nth-child(2) { animation-delay: 0.2s; }
+.sheets-sending-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes sheetsPanelIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes sheetsPanelOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+
+.sheets-panel {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 210px;
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  z-index: 20;
+  padding: 14px 16px 16px;
+  text-align: center;
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.sheets-panel.open {
+  display: block;
+  animation: sheetsPanelIn 0.4s ease both;
+}
+
+.sheets-panel.closing {
+  animation: sheetsPanelOut 0.3s ease both;
+}
+
+.sheets-panel-title {
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg);
+  opacity: 0.5;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  transition: color 0.4s ease;
+}
+
+.sheets-panel-desc {
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 10px;
+  color: var(--fg);
+  opacity: 0.4;
+  margin-bottom: 10px;
+  line-height: 1.4;
+  transition: color 0.4s ease;
+}
+
+.sheets-url-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: var(--fg);
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 9px;
+  padding: 6px 8px;
+  outline: none;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.4s ease;
+}
+
+.sheets-url-input:focus {
+  border-color: var(--ring);
+}
+
+.sheets-panel-status {
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 10px;
+  min-height: 16px;
+  margin-top: 6px;
+  color: #4ADE80;
+  opacity: 0.8;
+}
+
+.sheets-panel-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.sheets-cancel-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--fg);
+  cursor: pointer;
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 11px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.sheets-cancel-btn:hover { opacity: 1; }
+
+.sheets-save-btn {
+  background: var(--ring);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 11px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  transition: opacity 0.15s ease, background 0.4s ease;
+}
+
+.sheets-save-btn:hover { opacity: 0.82; }
+
+.sheets-bulk-btn {
+  margin-top: 8px;
+  width: 100%;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--fg);
+  cursor: pointer;
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 10px;
+  padding: 5px 0;
+  border-radius: 6px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.sheets-bulk-btn:hover { opacity: 1; background: rgba(255,255,255,0.06); }
+.sheets-bulk-btn:disabled { opacity: 0.3; cursor: default; }
+
 /* ── Completion notification ─────────────────────────────────────── */
 html.completion,
 html.completion body {

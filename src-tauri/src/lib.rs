@@ -17,7 +17,7 @@ fn get_or_create_records(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow>
         WebviewUrl::App("records.html".into()),
     )
     .title("記録")
-    .inner_size(360.0, 460.0)
+    .inner_size(480.0, 660.0)
     .resizable(false)
     .decorations(false)
     .transparent(true)
@@ -58,6 +58,22 @@ use std::sync::Mutex;
 static SAVED_POS: Mutex<Option<(f64, f64)>> = Mutex::new(None);
 static CURRENT_SIZE: Mutex<f64> = Mutex::new(280.0);
 const COMPLETION_SIZE: f64 = 400.0;
+
+#[tauri::command]
+fn get_window_position(app: tauri::AppHandle) -> Option<[f64; 2]> {
+    let win = app.get_webview_window("main")?;
+    let pos = win.outer_position().ok()?;
+    let monitor = win.current_monitor().ok()??;
+    let scale = monitor.scale_factor();
+    Some([pos.x as f64 / scale, pos.y as f64 / scale])
+}
+
+#[tauri::command]
+fn set_window_position(app: tauri::AppHandle, x: f64, y: f64) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_position(tauri::LogicalPosition::new(x, y));
+    }
+}
 
 #[tauri::command]
 fn resize_window(app: tauri::AppHandle, size: u32) {
@@ -123,6 +139,8 @@ pub fn run() {
             notify_completion,
             dismiss_completion,
             resize_window,
+            get_window_position,
+            set_window_position,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -133,7 +151,9 @@ pub fn run() {
                 } else if window.label() == "main" {
                     // JS側でセッション保存してから終了
                     api.prevent_close();
-                    let _ = window.eval("window.__saveSessionOnExit && window.__saveSessionOnExit()");
+                    if let Some(wv) = window.app_handle().get_webview_window("main") {
+                        let _ = wv.eval("window.__saveSessionOnExit && window.__saveSessionOnExit()");
+                    }
                     let app = window.app_handle().clone();
                     std::thread::spawn(move || {
                         std::thread::sleep(std::time::Duration::from_millis(200));

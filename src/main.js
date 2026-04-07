@@ -500,6 +500,95 @@ ctxOpenDevtools.addEventListener('click', async () => {
   await window.__TAURI__?.core?.invoke?.('open_records_devtools');
 });
 
+// ── Excel / Google Sheets integration setup panel ──────────────────
+const ctxSheetsSetup = document.getElementById('ctx-sheets-setup');
+const sheetsPanel = document.getElementById('sheets-panel');
+const sheetsUrlInput = document.getElementById('sheets-url-input');
+const sheetsPanelStatus = document.getElementById('sheets-panel-status');
+const sheetsCancelBtn = document.getElementById('sheets-cancel-btn');
+const sheetsSaveBtn = document.getElementById('sheets-save-btn');
+
+function openSheetsPanel() {
+  // Keep the legacy storage key so existing Google Sheets setups stay configured.
+  sheetsUrlInput.value = storageGet('mt_sheets_url', '');
+  sheetsPanelStatus.textContent = storageGet('mt_sheets_url', '') ? '設定済み' : '';
+  sheetsPanel.classList.add('open');
+  sheetsUrlInput.focus();
+  sheetsUrlInput.select();
+}
+
+function closeSheetsPanel() {
+  sheetsPanel.classList.add('closing');
+  sheetsPanel.addEventListener('animationend', () => {
+    sheetsPanel.classList.remove('open', 'closing');
+  }, { once: true });
+}
+
+ctxSheetsSetup.addEventListener('click', () => {
+  closeCtxMenu();
+  openSheetsPanel();
+});
+
+sheetsCancelBtn.addEventListener('click', () => closeSheetsPanel());
+
+sheetsSaveBtn.addEventListener('click', () => {
+  const url = sheetsUrlInput.value.trim();
+  storageSet('mt_sheets_url', url);
+  sheetsPanelStatus.textContent = url ? '保存しました' : '設定を削除しました';
+  setTimeout(() => closeSheetsPanel(), 800);
+});
+
+sheetsUrlInput.addEventListener('mousedown', (e) => e.stopPropagation());
+sheetsUrlInput.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { e.preventDefault(); sheetsSaveBtn.click(); }
+  if (e.key === 'Escape') closeSheetsPanel();
+});
+sheetsPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+
+const sheetsBulkBtn = document.getElementById('sheets-bulk-btn');
+
+function sessionToIntegrationRecord(session) {
+  return {
+    date: new Date(session.startedAt).toLocaleDateString('ja-JP'),
+    task: session.task,
+    detail: session.detail || '',
+    startTime: new Date(session.startedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+    endTime: new Date(session.endedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+    durationMin: Math.round(session.duration / 60 * 10) / 10,
+    isBreak: session.isBreak,
+  };
+}
+
+async function postIntegrationRecords(url, records) {
+  await fetch(url, { method: 'POST', body: JSON.stringify(records) });
+}
+
+sheetsBulkBtn.addEventListener('click', async () => {
+  const url = storageGet('mt_sheets_url', '');
+  if (!url) {
+    sheetsPanelStatus.textContent = '先に URL を保存してください';
+    return;
+  }
+  const allLogs = storageGet('mt_logs', []);
+  if (allLogs.length === 0) {
+    sheetsPanelStatus.textContent = '送信する記録がありません';
+    return;
+  }
+  sheetsBulkBtn.classList.add('sending');
+  sheetsBulkBtn.innerHTML = `送信中<span class="sheets-sending-dots"><span></span><span></span><span></span></span>`;
+  sheetsPanelStatus.textContent = `${allLogs.length}件`;
+  const body = allLogs.map(sessionToIntegrationRecord);
+  try {
+    await postIntegrationRecords(url, body);
+    sheetsPanelStatus.textContent = `✓ ${allLogs.length}件 送信しました`;
+  } catch (_) {
+    sheetsPanelStatus.textContent = '送信に失敗しました';
+  }
+  sheetsBulkBtn.classList.remove('sending');
+  sheetsBulkBtn.textContent = '過去の記録を送信';
+});
+
 circle.addEventListener('mousedown', () => closeCtxMenu());
 document.addEventListener('click', (e) => {
   if (!ctxMenu.contains(e.target) && e.target !== btnRecords) closeCtxMenu();
@@ -508,17 +597,29 @@ document.addEventListener('click', (e) => {
 // ── Timer click → edit mode ────────────────────────────────────────────────
 function parseTimeInput(s) {
   s = s.trim();
+  // 数字のみ → 分として解釈（最大480分 = 8時間）
   if (/^\d+$/.test(s)) {
-    const m = Math.max(1, Math.min(90, parseInt(s)));
+    const m = Math.max(1, Math.min(480, parseInt(s)));
     return m * 60;
   }
-  const match = s.match(/^(\d{1,2}):(\d{2})$/);
+  // H:MM:SS 形式
+  const matchHMS = s.match(/^(\d+):(\d{2}):(\d{2})$/);
+  if (matchHMS) {
+    const h = parseInt(matchHMS[1]);
+    const m = parseInt(matchHMS[2]);
+    const sec = parseInt(matchHMS[3]);
+    if (m >= 60 || sec >= 60) return null;
+    const total = h * 3600 + m * 60 + sec;
+    return Math.max(60, Math.min(28800, total));
+  }
+  // MM:SS 形式（分:秒）
+  const match = s.match(/^(\d{1,3}):(\d{2})$/);
   if (match) {
     const m = parseInt(match[1]);
     const sec = parseInt(match[2]);
     if (sec >= 60) return null;
     const total = m * 60 + sec;
-    return Math.max(60, Math.min(5400, total));
+    return Math.max(60, Math.min(28800, total));
   }
   return null;
 }
@@ -592,6 +693,20 @@ function saveTaskState() {
   storageSet('mt_current_detail', currentDetail);
 }
 
+// タイマー実行中でもタスクを切り替えられる。変更時は現セッションを自動ログ
+function switchTask(newTask, newDetail) {
+  const changed = currentTask !== newTask || currentDetail !== (newDetail ?? '');
+  if (st.running && changed) {
+    logSession();
+    st.sessionStart = Date.now();
+  }
+  currentTask = newTask;
+  currentDetail = newDetail ?? '';
+  saveTaskState();
+  renderTaskName();
+  closeTaskPanel();
+}
+
 function renderTaskName() {
   taskNameEl.textContent = currentDetail ? `${currentTask} / ${currentDetail}` : currentTask;
 }
@@ -602,13 +717,7 @@ function renderTaskPanel() {
   const noneEl = document.createElement('div');
   noneEl.className = 'task-item' + (currentTask === '' ? ' active' : '');
   noneEl.innerHTML = `<span class="task-item-toggle" style="opacity:0"></span><span class="task-item-name">なし</span>`;
-  noneEl.addEventListener('click', () => {
-    currentTask = '';
-    currentDetail = '';
-    saveTaskState();
-    renderTaskName();
-    closeTaskPanel();
-  });
+  noneEl.addEventListener('click', () => switchTask('', ''));
   taskPanelList.appendChild(noneEl);
 
   tasks.forEach((task, i) => {
@@ -648,13 +757,7 @@ function renderTaskPanel() {
     el.appendChild(toggle);
     el.appendChild(nameSpan);
     el.appendChild(del);
-    el.addEventListener('click', () => {
-      currentTask = taskName;
-      currentDetail = '';
-      saveTaskState();
-      renderTaskName();
-      closeTaskPanel();
-    });
+    el.addEventListener('click', () => switchTask(taskName, ''));
     taskPanelList.appendChild(el);
 
     if (isExpanded) {
@@ -686,13 +789,7 @@ function renderTaskPanel() {
         detailEl.appendChild(indent);
         detailEl.appendChild(detailName);
         detailEl.appendChild(detailDel);
-        detailEl.addEventListener('click', () => {
-          currentTask = taskName;
-          currentDetail = detail;
-          saveTaskState();
-          renderTaskName();
-          closeTaskPanel();
-        });
+        detailEl.addEventListener('click', () => switchTask(taskName, detail));
         taskPanelList.appendChild(detailEl);
       });
 
@@ -782,7 +879,7 @@ function logSession() {
   const endedAt = Date.now();
   const startedAt = st.sessionStart ?? (endedAt - duration * 1000);
   st.sessionStart = null;
-  logs.push({
+  const session = {
     id: Math.random().toString(36).slice(2),
     task: currentTask || '(タスクなし)',
     detail: currentDetail || null,
@@ -791,13 +888,28 @@ function logSession() {
     endedAt,
     mode: st.mode,
     isBreak: st.breakMode,
-  });
+  };
+  logs.push(session);
   storageSet('mt_logs', logs);
+  syncToIntegrationUrl(session);
+}
+
+// ── Excel / Google Sheets sync ─────────────────────────────────────────────
+async function syncToIntegrationUrl(session) {
+  const url = storageGet('mt_sheets_url', '');
+  if (!url) return;
+  try {
+    await postIntegrationRecords(url, [sessionToIntegrationRecord(session)]);
+  } catch (_) {
+    // ネットワークエラーは無視（アプリの動作を止めない）
+  }
 }
 
 // ── Save session on exit ───────────────────────────────────────────────────
-window.__saveSessionOnExit = () => {
+window.__saveSessionOnExit = async () => {
   if (st.running) logSession();
+  const pos = await window.__TAURI__?.core?.invoke?.('get_window_position');
+  if (pos) storageSet('mt_window_pos', pos);
 };
 
 // ── Scroll → resize window (Ctrl) or adjust countdown total ───────────────
@@ -813,7 +925,7 @@ circle.addEventListener('wheel', (e) => {
   // 通常スクロール: カウントダウン時間調整（停止中のみ）
   if (st.running) return;
   const delta = e.deltaY > 0 ? 60 : -60;
-  st.total = Math.max(60, Math.min(5400, st.total + delta));
+  st.total = Math.max(60, Math.min(28800, st.total + delta));
   refreshText();
   draw();
 }, { passive: false });
@@ -837,6 +949,11 @@ circle.addEventListener('wheel', (e) => {
   refreshText();
   renderTaskName();
   if (currentWindowSize !== 280) applyWindowSize(currentWindowSize);
+  // 前回のウィンドウ位置を復元
+  const savedPos = storageGet('mt_window_pos', null);
+  if (savedPos) {
+    await window.__TAURI__?.core?.invoke?.('set_window_position', { x: savedPos[0], y: savedPos[1] });
+  }
   // 停止状態で起動するため rAF は使わず、時計のみ定期更新
   clockTickInterval = setInterval(() => {
     clockEl.textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
