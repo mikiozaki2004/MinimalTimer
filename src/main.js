@@ -61,6 +61,7 @@ const btnRecords = document.getElementById('btn-records');
 const btnBreak = document.getElementById('btn-break');
 const btnPomo = document.getElementById('btn-pomo');
 const pomoStatusEl = document.getElementById('pomo-status');
+const syncStatusEl = document.getElementById('sync-status');
 const pomoPanel = document.getElementById('pomo-panel');
 const pomoSetsDisplay = document.getElementById('pomo-sets-display');
 const pomoSetsDecBtn = document.getElementById('pomo-sets-dec');
@@ -307,8 +308,8 @@ function closePomoPanel() {
 // ── Break mode ─────────────────────────────────────────────────────────────
 function enterBreak() {
   if (st.breakMode) return;
-  // 実行中なら作業セッションを記録
-  if (st.running) logSession();
+  // 一時停止中でも、開始済みの作業時間があれば休憩前に記録する
+  if (st.sessionStart !== null && st.elapsed >= 5) logSession();
   // 現在のタスクとタイマー設定を退避
   savedTask = currentTask;
   savedDetail = currentDetail;
@@ -572,6 +573,55 @@ sheetsPanel.addEventListener('mousedown', (e) => e.stopPropagation());
 
 const sheetsBulkBtn = document.getElementById('sheets-bulk-btn');
 const excelBulkBtn = document.getElementById('excel-bulk-btn');
+let integrationSyncPending = 0;
+let integrationSyncHideTimer = null;
+
+function showIntegrationSyncStatus(text, state = 'active') {
+  clearTimeout(integrationSyncHideTimer);
+  syncStatusEl.className = 'sync-status';
+  syncStatusEl.textContent = text;
+  if (!text) return;
+  syncStatusEl.classList.add('active');
+  if (state === 'error') syncStatusEl.classList.add('error');
+  if (state === 'success') syncStatusEl.classList.add('success');
+}
+
+function hideIntegrationSyncStatus(delay = 0) {
+  clearTimeout(integrationSyncHideTimer);
+  integrationSyncHideTimer = setTimeout(() => {
+    syncStatusEl.className = 'sync-status';
+    syncStatusEl.textContent = '';
+  }, delay);
+}
+
+async function runWithIntegrationSyncStatus(text, fn, { successText = '', errorText = '' } = {}) {
+  integrationSyncPending++;
+  showIntegrationSyncStatus(text);
+  try {
+    const result = await fn();
+    integrationSyncPending = Math.max(0, integrationSyncPending - 1);
+    if (integrationSyncPending === 0) {
+      if (successText) {
+        showIntegrationSyncStatus(successText, 'success');
+        hideIntegrationSyncStatus(1200);
+      } else {
+        hideIntegrationSyncStatus(150);
+      }
+    }
+    return result;
+  } catch (err) {
+    integrationSyncPending = Math.max(0, integrationSyncPending - 1);
+    if (integrationSyncPending === 0) {
+      if (errorText) {
+        showIntegrationSyncStatus(errorText, 'error');
+        hideIntegrationSyncStatus(1800);
+      } else {
+        hideIntegrationSyncStatus(150);
+      }
+    }
+    throw err;
+  }
+}
 
 function sessionToIntegrationRecord(session) {
   const duration = Number(session.duration ?? 0);
@@ -600,14 +650,16 @@ async function appendIntegrationRecordsToExcel(records) {
 }
 
 async function syncSessionIntegrations(session) {
+  const hasUrl = Boolean(storageGet('mt_sheets_url', ''));
+  const hasExcel = Boolean(storageGet('mt_excel_path', ''));
   const jobs = [];
-  if (storageGet('mt_sheets_url', '')) {
-    jobs.push(syncToIntegrationUrl(session));
-  }
-  if (storageGet('mt_excel_path', '')) {
-    jobs.push(syncToLocalExcel(session));
-  }
-  await Promise.allSettled(jobs);
+  if (hasUrl) jobs.push(syncToIntegrationUrl(session));
+  if (hasExcel) jobs.push(syncToLocalExcel(session));
+  if (jobs.length === 0) return;
+  const statusText = hasExcel ? 'Excel追記中...' : '送信中...';
+  await runWithIntegrationSyncStatus(statusText, async () => {
+    await Promise.allSettled(jobs);
+  }, { successText: hasExcel ? '追記完了' : '送信完了' });
 }
 
 sheetsBulkBtn.addEventListener('click', async () => {
@@ -627,7 +679,9 @@ sheetsBulkBtn.addEventListener('click', async () => {
   sheetsPanelStatus.textContent = `${allLogs.length}件`;
   const body = allLogs.map(sessionToIntegrationRecord);
   try {
-    await postIntegrationRecords(url, body);
+    await runWithIntegrationSyncStatus('送信中...', async () => {
+      await postIntegrationRecords(url, body);
+    }, { successText: '送信完了', errorText: '送信失敗' });
     sheetsPanelStatus.textContent = `✓ ${allLogs.length}件 送信しました`;
   } catch (_) {
     sheetsPanelStatus.textContent = '送信に失敗しました';
@@ -653,7 +707,9 @@ excelBulkBtn.addEventListener('click', async () => {
   sheetsPanelStatus.textContent = `${allLogs.length}件`;
   const body = allLogs.map(sessionToIntegrationRecord);
   try {
-    await appendIntegrationRecordsToExcel(body);
+    await runWithIntegrationSyncStatus('Excel追記中...', async () => {
+      await appendIntegrationRecordsToExcel(body);
+    }, { successText: '追記完了', errorText: '追記失敗' });
     sheetsPanelStatus.textContent = `✓ ${allLogs.length}件 追記しました`;
   } catch (err) {
     sheetsPanelStatus.textContent = `追記に失敗しました: ${String(err)}`;

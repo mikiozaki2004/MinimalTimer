@@ -256,6 +256,32 @@ body {
   display: flex;
 }
 
+.sync-status {
+  min-height: 12px;
+  margin-top: 2px;
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 10px;
+  color: #4ADE80;
+  opacity: 0;
+  text-align: center;
+  transform: translateY(2px);
+  transition: opacity 0.18s ease, transform 0.18s ease, color 0.25s ease;
+  pointer-events: none;
+}
+
+.sync-status.active {
+  opacity: 0.88;
+  transform: translateY(0);
+}
+
+.sync-status.error {
+  color: #F87171;
+}
+
+.sync-status.success {
+  color: #86EFAC;
+}
+
 .pomo-dot {
   width: 6px;
   height: 6px;

@@ -268,20 +268,20 @@ body {
 
 /* Selected */
 .cal-cell.selected {
-  background: rgba(88, 166, 255, 0.18) !important;
-  outline: 1.5px solid rgba(88, 166, 255, 0.50);
+  background: rgba(74, 222, 128, 0.16) !important;
+  outline: 1.5px solid rgba(74, 222, 128, 0.46);
   outline-offset: -1.5px;
   opacity: 1 !important;
 }
 
 body.light .cal-cell.selected {
-  background: rgba(37, 99, 235, 0.13) !important;
-  outline-color: rgba(37, 99, 235, 0.42);
+  background: rgba(34, 197, 94, 0.15) !important;
+  outline-color: rgba(34, 197, 94, 0.42);
 }
 
 body.sunset .cal-cell.selected {
-  background: rgba(233, 69, 96, 0.18) !important;
-  outline-color: rgba(233, 69, 96, 0.50);
+  background: rgba(52, 211, 153, 0.16) !important;
+  outline-color: rgba(52, 211, 153, 0.46);
 }
 
 /* Date number */
