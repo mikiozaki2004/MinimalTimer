@@ -6,6 +6,8 @@ use std::{
     sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -149,7 +151,7 @@ fn dismiss_completion(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn append_excel_records(
+async fn append_excel_records(
     workbook_path: String,
     records: Vec<IntegrationRecord>,
 ) -> Result<usize, String> {
@@ -159,7 +161,7 @@ fn append_excel_records(
 
     let workbook_path = workbook_path
         .trim()
-        .trim_matches(|c| matches!(c, '"' | '\'' | '“' | '”'))
+        .trim_matches(|c| matches!(c, '"' | '\'' | '"' | '"'))
         .to_string();
 
     if !Path::new(&workbook_path).exists() {
@@ -177,10 +179,16 @@ fn append_excel_records(
     ));
 
     fs::write(&temp_path, json).map_err(|e| e.to_string())?;
-    let result = run_excel_append_script(&workbook_path, temp_path.to_string_lossy().as_ref());
-    let _ = fs::remove_file(&temp_path);
+    let count = records.len();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let r = run_excel_append_script(&workbook_path, temp_path.to_string_lossy().as_ref());
+        let _ = fs::remove_file(&temp_path);
+        r
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
-    result.map(|_| records.len())
+    result.map(|_| count)
 }
 
 #[cfg(target_os = "windows")]
@@ -269,6 +277,7 @@ try {
     fs::write(&script_path, script_bytes).map_err(|e| e.to_string())?;
     let script_path_arg = script_path.to_string_lossy().to_string();
 
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
     let output = Command::new("powershell.exe")
         .args([
             "-NoProfile",
@@ -288,6 +297,7 @@ try {
             "時間(分)",
             "休憩",
         ])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| e.to_string());
     let _ = fs::remove_file(&script_path);
