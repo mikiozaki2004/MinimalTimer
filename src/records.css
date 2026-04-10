@@ -618,6 +618,10 @@ body.sunset .session-row.break .session-dur  { color: #34D399; }
   background: rgba(88, 166, 255, 0.04);
 }
 
+.add-select {
+  cursor: pointer;
+}
+
 body.light .add-input:focus { background: rgba(37, 99, 235, 0.04); }
 body.sunset .add-input:focus { background: rgba(233, 69, 96, 0.04); }
 

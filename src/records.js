@@ -57,6 +57,27 @@ function taskFontSize(text) {
   return '9px';
 }
 
+function readLatestStorageValue(key, fallback) {
+  const raw = localStorage.getItem(key);
+  if (raw === null) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function getAddFormTaskOptions() {
+  const rawTasks = readLatestStorageValue('mt_tasks', []);
+  const storedTasks = (Array.isArray(rawTasks) ? rawTasks : [])
+    .map((task) => typeof task === 'string' ? task : String(task?.name ?? '').trim())
+    .filter((task) => task && task !== '休憩');
+  const loggedTasks = logs
+    .filter((log) => !log.isBreak && log.task && log.task !== '休憩')
+    .map((log) => log.task);
+  return [...new Set([...storedTasks, ...loggedTasks])];
+}
+
 // ── Count-up animation ───────────────────────────────────────────────────────
 function animateCount(el, targetSec) {
   if (targetSec === 0) { el.textContent = ''; return; }
@@ -347,13 +368,20 @@ document.getElementById('next-month-btn').addEventListener('click', () => {
 function openAddForm() {
   document.getElementById('add-date').value = selectedDate;
 
-  const datalist = document.getElementById('add-task-list');
-  datalist.innerHTML = '';
-  const tasks = [...new Set(logs.filter(l => !l.isBreak).map(l => l.task))];
-  tasks.forEach(t => {
-    const o = document.createElement('option');
-    o.value = t;
-    datalist.appendChild(o);
+  const taskSelect = document.getElementById('add-task');
+  const tasks = getAddFormTaskOptions();
+  taskSelect.innerHTML = '';
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = tasks.length ? 'タスクを選択' : '先にタスクを追加してください';
+  taskSelect.appendChild(placeholder);
+
+  tasks.forEach((task) => {
+    const option = document.createElement('option');
+    option.value = task;
+    option.textContent = task;
+    taskSelect.appendChild(option);
   });
 
   const now = new Date();
@@ -361,11 +389,12 @@ function openAddForm() {
   document.getElementById('add-end').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
   const startH = Math.max(0, now.getHours() - 1);
   document.getElementById('add-start').value = `${pad(startH)}:${pad(now.getMinutes())}`;
-  document.getElementById('add-task').value = tasks[0] || '';
+  const currentTask = String(readLatestStorageValue('mt_current_task', '') || '');
+  taskSelect.value = tasks.includes(currentTask) ? currentTask : (tasks[0] || '');
 
   document.getElementById('add-form').classList.remove('hidden');
   updateDurationPreview();
-  document.getElementById('add-task').focus();
+  taskSelect.focus();
 }
 
 function closeAddForm() {

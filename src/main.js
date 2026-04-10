@@ -68,10 +68,6 @@ const pomoSetsDecBtn = document.getElementById('pomo-sets-dec');
 const pomoSetsIncBtn = document.getElementById('pomo-sets-inc');
 const pomoStartBtn = document.getElementById('pomo-start-btn');
 const taskNameEl = document.getElementById('task-name');
-const taskPanel = document.getElementById('task-panel');
-const taskPanelList = document.getElementById('task-panel-list');
-const taskPanelInput = document.getElementById('task-panel-input');
-const taskPanelAddBtn = document.getElementById('task-panel-add-btn');
 const iconPlay = document.getElementById('icon-play');
 const iconPause = document.getElementById('icon-pause');
 
@@ -376,7 +372,6 @@ btnPomo.addEventListener('click', (e) => {
     refreshText();
     draw();
   } else {
-    closeTaskPanel();
     pomoPanel.classList.contains('open') ? closePomoPanel() : openPomoPanel();
   }
 });
@@ -480,6 +475,18 @@ btnPin.addEventListener('click', async () => {
 btnRecords.addEventListener('click', async () => {
   closeCtxMenu();
   await window.__TAURI__?.core?.invoke?.('open_records');
+});
+
+async function openTaskWindow() {
+  closeCtxMenu();
+  if (pomoPanel.classList.contains('open')) closePomoPanel();
+  if (sheetsPanel.classList.contains('open')) closeSheetsPanel();
+  await window.__TAURI__?.core?.invoke?.('open_task_window');
+}
+
+btnTask.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  await openTaskWindow();
 });
 
 // ── Records context menu (right-click) ─────────────────────────────
@@ -810,192 +817,38 @@ document.addEventListener('keydown', (e) => {
   if (st.running) startTick();
 });
 
-// ── Task management ────────────────────────────────────────────────────────
-let tasks = [];
+// ── Task state ─────────────────────────────────────────────────────────────
 let currentTask = '';
 let currentDetail = '';
-let expandedTaskName = null;
-
-function saveTaskState() {
-  storageSet('mt_tasks', tasks);
-  storageSet('mt_current_task', currentTask);
-  storageSet('mt_current_detail', currentDetail);
-}
-
-// タイマー実行中でもタスクを切り替えられる。変更時は現セッションを自動ログ
-function switchTask(newTask, newDetail) {
-  const changed = currentTask !== newTask || currentDetail !== (newDetail ?? '');
-  if (st.running && changed) {
-    logSession();
-    st.sessionStart = Date.now();
-  }
-  currentTask = newTask;
-  currentDetail = newDetail ?? '';
-  saveTaskState();
-  renderTaskName();
-  closeTaskPanel();
-}
 
 function renderTaskName() {
   taskNameEl.textContent = currentDetail ? `${currentTask} / ${currentDetail}` : currentTask;
 }
 
-function renderTaskPanel() {
-  taskPanelList.innerHTML = '';
+function applyTaskState(payload = {}) {
+  const nextTask = payload.task || '';
+  const nextDetail = payload.detail || '';
+  const shouldLog = Boolean(payload.logPrevious);
+  const changed = currentTask !== nextTask || currentDetail !== nextDetail;
 
-  const noneEl = document.createElement('div');
-  noneEl.className = 'task-item' + (currentTask === '' ? ' active' : '');
-  noneEl.innerHTML = `<span class="task-item-toggle" style="opacity:0"></span><span class="task-item-name">なし</span>`;
-  noneEl.addEventListener('click', () => switchTask('', ''));
-  taskPanelList.appendChild(noneEl);
-
-  tasks.forEach((task, i) => {
-    const taskName = task.name;
-    const isExpanded = expandedTaskName === taskName;
-    const isActive = currentTask === taskName && currentDetail === '';
-
-    const el = document.createElement('div');
-    el.className = 'task-item' + (isActive ? ' active' : '');
-
-    const toggle = document.createElement('span');
-    toggle.className = 'task-item-toggle';
-    toggle.textContent = isExpanded ? '▾' : '▸';
-    toggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      expandedTaskName = isExpanded ? null : taskName;
-      renderTaskPanel();
-    });
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'task-item-name';
-    nameSpan.textContent = taskName;
-
-    const del = document.createElement('span');
-    del.className = 'task-item-del';
-    del.textContent = '✕';
-    del.addEventListener('click', (e) => {
-      e.stopPropagation();
-      tasks.splice(i, 1);
-      if (currentTask === taskName) { currentTask = ''; currentDetail = ''; }
-      if (expandedTaskName === taskName) expandedTaskName = null;
-      saveTaskState();
-      renderTaskName();
-      renderTaskPanel();
-    });
-
-    el.appendChild(toggle);
-    el.appendChild(nameSpan);
-    el.appendChild(del);
-    el.addEventListener('click', () => switchTask(taskName, ''));
-    taskPanelList.appendChild(el);
-
-    if (isExpanded) {
-      task.details.forEach((detail, j) => {
-        const isDetailActive = currentTask === taskName && currentDetail === detail;
-        const detailEl = document.createElement('div');
-        detailEl.className = 'task-item detail-item' + (isDetailActive ? ' active' : '');
-
-        const indent = document.createElement('span');
-        indent.className = 'detail-indent';
-        indent.textContent = '└';
-
-        const detailName = document.createElement('span');
-        detailName.className = 'task-item-name';
-        detailName.textContent = detail;
-
-        const detailDel = document.createElement('span');
-        detailDel.className = 'task-item-del';
-        detailDel.textContent = '✕';
-        detailDel.addEventListener('click', (e) => {
-          e.stopPropagation();
-          task.details.splice(j, 1);
-          if (currentTask === taskName && currentDetail === detail) currentDetail = '';
-          saveTaskState();
-          renderTaskName();
-          renderTaskPanel();
-        });
-
-        detailEl.appendChild(indent);
-        detailEl.appendChild(detailName);
-        detailEl.appendChild(detailDel);
-        detailEl.addEventListener('click', () => switchTask(taskName, detail));
-        taskPanelList.appendChild(detailEl);
-      });
-
-      const addRow = document.createElement('div');
-      addRow.className = 'detail-add-row';
-      addRow.innerHTML = `<span class="detail-indent">└</span><input class="detail-add-input" type="text" maxlength="20" placeholder="詳細を追加..."><button class="detail-add-btn">＋</button>`;
-
-      const addInput = addRow.querySelector('.detail-add-input');
-      const addBtn = addRow.querySelector('.detail-add-btn');
-      const addDetail = () => {
-        const name = addInput.value.trim();
-        if (name && !task.details.includes(name)) {
-          task.details.push(name);
-          saveTaskState();
-          renderTaskPanel();
-        }
-        addInput.value = '';
-      };
-      addRow.addEventListener('click', (e) => e.stopPropagation());
-      addInput.addEventListener('mousedown', (e) => e.stopPropagation());
-      addInput.addEventListener('keydown', (e) => {
-        e.stopPropagation();
-        if (e.key === 'Enter') { e.preventDefault(); addDetail(); }
-        if (e.key === 'Escape') closeTaskPanel();
-      });
-      addBtn.addEventListener('click', (e) => { e.stopPropagation(); addDetail(); });
-      taskPanelList.appendChild(addRow);
-    }
-  });
-}
-
-function openTaskPanel() {
-  renderTaskPanel();
-  taskPanel.classList.add('open');
-  taskPanelInput.focus();
-}
-
-function closeTaskPanel() {
-  taskPanelInput.value = '';
-  taskPanel.classList.add('closing');
-  taskPanel.addEventListener('animationend', () => {
-    taskPanel.classList.remove('open', 'closing');
-  }, { once: true });
-}
-
-function addTask() {
-  const name = taskPanelInput.value.trim();
-  if (name && !tasks.some(t => t.name === name)) {
-    tasks.push({ name, details: [] });
-    saveTaskState();
-    renderTaskPanel();
+  if (st.breakMode) {
+    savedTask = nextTask;
+    savedDetail = nextDetail;
+    return;
   }
-  taskPanelInput.value = '';
+
+  if (changed && st.running && shouldLog) {
+    logSession();
+    st.sessionStart = Date.now();
+  }
+
+  currentTask = nextTask;
+  currentDetail = nextDetail;
+  renderTaskName();
 }
-
-btnTask.addEventListener('click', (e) => {
-  e.stopPropagation();
-  taskPanel.classList.contains('open') ? closeTaskPanel() : openTaskPanel();
-});
-
-taskPanel.addEventListener('mousedown', (e) => e.stopPropagation());
-taskPanel.addEventListener('wheel', (e) => e.stopPropagation());
-
-taskPanelInput.addEventListener('keydown', (e) => {
-  e.stopPropagation();
-  if (e.key === 'Enter') { e.preventDefault(); addTask(); }
-  if (e.key === 'Escape') closeTaskPanel();
-});
-
-taskPanelAddBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  addTask();
-});
 
 circle.addEventListener('click', () => {
   if (completionActive) { dismissCompletion(); return; }
-  if (taskPanel.classList.contains('open')) closeTaskPanel();
   if (pomoPanel.classList.contains('open')) closePomoPanel();
 });
 
@@ -1075,10 +928,15 @@ circle.addEventListener('wheel', (e) => {
 (async () => {
   await initStorage();
 
-  tasks = storageGet('mt_tasks', []).map(t => typeof t === 'string' ? { name: t, details: [] } : t);
-  currentTask = storageGet('mt_current_task', '');
-  currentDetail = storageGet('mt_current_detail', '');
+  applyTaskState({
+    task: storageGet('mt_current_task', ''),
+    detail: storageGet('mt_current_detail', ''),
+    logPrevious: false,
+  });
   logs = storageGet('mt_logs', []);
+  await window.__TAURI__?.event?.listen?.('task-state-changed', ({ payload }) => {
+    applyTaskState(payload ?? {});
+  }, { target: 'main' });
 
   const savedTheme = storageGet('mt_theme', '');
   document.body.className = savedTheme;

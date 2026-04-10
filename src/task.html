@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="task.css">
+  <title>タスク</title>
+</head>
+<body>
+  <div class="card">
+    <div class="header" data-tauri-drag-region>
+      <span class="header-title">タスク</span>
+      <button class="close-btn" id="close-btn" title="閉じる" type="button">✕</button>
+    </div>
+
+    <div class="task-list" id="task-list"></div>
+
+    <div class="footer">
+      <input class="add-input" id="add-input" type="text" maxlength="30" placeholder="タスクを追加...">
+      <button class="add-btn" id="add-btn" type="button">＋</button>
+    </div>
+  </div>
+  <script src="task.js" type="module"></script>
+</body>
+</html>

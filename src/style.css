@@ -102,12 +102,14 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  transform: translate(-50%, -50%);
+  /* +5px で timer テキストを円の幾何的中心に合わせる
+     (clock が上に~20px, task-name+sync が下に~30px あるため) */
+  transform: translate(-50%, calc(-50% + 5px));
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .circle:hover .center-group {
-  transform: translate(-50%, calc(-50% - 14px));
+  transform: translate(-50%, calc(-50% + 5px - 14px));
 }
 
 /* ── Timer text ──────────────────────────────────────────────────── */

@@ -23,6 +23,61 @@ struct IntegrationRecord {
     is_break: bool,
 }
 
+const TASK_WINDOW_WIDTH: f64 = 300.0;
+const TASK_WINDOW_HEIGHT: f64 = 400.0;
+const TASK_WINDOW_GAP: f64 = 16.0;
+
+fn clamp_position(value: f64, min: f64, max: f64) -> f64 {
+    if max <= min {
+        min
+    } else {
+        value.max(min).min(max)
+    }
+}
+
+fn position_task_window_near_main(app: &tauri::AppHandle, task_win: &tauri::WebviewWindow) {
+    let Some(main_win) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(main_pos) = main_win.outer_position() else {
+        return;
+    };
+    let Ok(main_size) = main_win.outer_size() else {
+        return;
+    };
+    let Ok(Some(monitor)) = main_win.current_monitor() else {
+        return;
+    };
+
+    let scale = monitor.scale_factor();
+    let monitor_x = monitor.position().x as f64 / scale;
+    let monitor_y = monitor.position().y as f64 / scale;
+    let monitor_w = monitor.size().width as f64 / scale;
+    let monitor_h = monitor.size().height as f64 / scale;
+    let main_x = main_pos.x as f64 / scale;
+    let main_y = main_pos.y as f64 / scale;
+    let main_w = main_size.width as f64 / scale;
+    let main_h = main_size.height as f64 / scale;
+
+    let right_x = main_x + main_w + TASK_WINDOW_GAP;
+    let left_x = main_x - TASK_WINDOW_WIDTH - TASK_WINDOW_GAP;
+    let centered_x = main_x + (main_w - TASK_WINDOW_WIDTH) / 2.0;
+    let centered_y = main_y + (main_h - TASK_WINDOW_HEIGHT) / 2.0;
+    let max_x = monitor_x + monitor_w - TASK_WINDOW_WIDTH;
+    let max_y = monitor_y + monitor_h - TASK_WINDOW_HEIGHT;
+
+    let x = if right_x <= max_x {
+        right_x
+    } else if left_x >= monitor_x {
+        left_x
+    } else {
+        clamp_position(centered_x, monitor_x, max_x)
+    };
+    let y = clamp_position(centered_y, monitor_y, max_y);
+
+    let _ = task_win.set_position(tauri::LogicalPosition::new(x, y));
+}
+
 /// records ウィンドウを取得または再作成して返す
 fn get_or_create_records(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
     // 既存のウィンドウがあればそれを返す
@@ -55,7 +110,38 @@ fn get_or_create_records(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow>
 
 #[tauri::command]
 fn open_records(app: tauri::AppHandle) {
-    get_or_create_records(&app);
+  get_or_create_records(&app);
+}
+
+/// task ウィンドウを取得または再作成して返す
+fn get_or_create_task(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    if let Some(win) = app.get_webview_window("task") {
+        let _ = win.eval("window.refreshTasks && window.refreshTasks()");
+        position_task_window_near_main(app, &win);
+        let _ = win.show();
+        let _ = win.set_focus();
+        return Some(win);
+    }
+
+    WebviewWindowBuilder::new(app, "task", WebviewUrl::App("task.html".into()))
+        .title("タスク")
+        .inner_size(TASK_WINDOW_WIDTH, TASK_WINDOW_HEIGHT)
+        .resizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .build()
+        .ok()
+        .map(|win| {
+            position_task_window_near_main(app, &win);
+            let _ = win.set_focus();
+            win
+        })
+}
+
+#[tauri::command]
+fn open_task_window(app: tauri::AppHandle) {
+    get_or_create_task(&app);
 }
 
 #[tauri::command]
@@ -70,9 +156,9 @@ fn open_records_devtools(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn hide_records(app: tauri::AppHandle) {
-    if let Some(win) = app.get_webview_window("records") {
-        let _ = win.hide();
-    }
+  if let Some(win) = app.get_webview_window("records") {
+    let _ = win.hide();
+  }
 }
 
 // ── Completion notification ────────────────────────────────────────
@@ -161,7 +247,7 @@ async fn append_excel_records(
 
     let workbook_path = workbook_path
         .trim()
-        .trim_matches(|c| matches!(c, '"' | '\'' | '"' | '"'))
+        .trim_matches(|c| c == '"' || c == '\'')
         .to_string();
 
     if !Path::new(&workbook_path).exists() {
@@ -281,6 +367,9 @@ try {
     let output = Command::new("powershell.exe")
         .args([
             "-NoProfile",
+            "-WindowStyle",
+            "Hidden",
+            "-NonInteractive",
             "-ExecutionPolicy",
             "Bypass",
             "-File",
@@ -323,6 +412,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             open_records,
+            open_task_window,
             open_records_devtools,
             hide_records,
             notify_completion,
@@ -336,6 +426,9 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "records" {
                     // records ウィンドウの閉じるイベントを横取りして hide に変換
+                    api.prevent_close();
+                    let _ = window.hide();
+                } else if window.label() == "task" {
                     api.prevent_close();
                     let _ = window.hide();
                 } else if window.label() == "main" {

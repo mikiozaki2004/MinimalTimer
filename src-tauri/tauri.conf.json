@@ -29,6 +29,18 @@
         "transparent": true,
         "shadow":      false,
         "visible":     false
+      },
+      {
+        "label":       "task",
+        "url":         "task.html",
+        "title":       "タスク",
+        "width":       300,
+        "height":      400,
+        "resizable":   false,
+        "decorations": false,
+        "transparent": true,
+        "shadow":      false,
+        "visible":     false
       }
     ],
     "security": {

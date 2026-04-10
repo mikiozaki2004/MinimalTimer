@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for MinimalTimer",
-  "windows": ["main", "records"],
+  "windows": ["main", "records", "task"],
   "permissions": [
     "core:default",
     "core:window:allow-set-always-on-top",
