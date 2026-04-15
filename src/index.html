@@ -30,8 +30,10 @@
       <input class="timer-input" id="timer-input" type="text" maxlength="8" placeholder="25:00">
       <div class="task-name" id="task-name"></div>
       <div class="pomo-status" id="pomo-status"></div>
-      <div class="sync-status" id="sync-status" aria-live="polite"></div>
     </div>
+
+    <!-- Sync status (positioned at bottom of circle, outside center-group) -->
+    <div class="sync-status" id="sync-status" aria-live="polite"></div>
 
     <!-- Primary controls (center bottom, hover only) -->
     <div class="controls ctrl-fade">
@@ -114,17 +116,6 @@
       <button class="sheets-bulk-btn" id="excel-bulk-btn">Excelへ過去の記録を追記</button>
     </div>
 
-    <!-- Pomodoro setup panel -->
-    <div class="pomo-panel" id="pomo-panel">
-      <div class="pomo-panel-title">ポモドーロ</div>
-      <div class="pomo-panel-sets">
-        <button class="pomo-sets-btn" id="pomo-sets-dec">−</button>
-        <span class="pomo-sets-count" id="pomo-sets-display">4</span>
-        <span class="pomo-sets-label">セット</span>
-        <button class="pomo-sets-btn" id="pomo-sets-inc">＋</button>
-      </div>
-      <button class="pomo-start-btn" id="pomo-start-btn">開始</button>
-    </div>
   </div>
   <script src="main.js" type="module"></script>
 </body>

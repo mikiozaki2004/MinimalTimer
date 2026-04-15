@@ -11,7 +11,7 @@ const st = {
   elapsed: 0,
   total: 25 * 60,
   themeIdx: 0,
-  pinned: false,
+  pinned: true,
   sessionStart: null,
   breakMode: false,
 };
@@ -37,7 +37,6 @@ const pomo = {
   totalSets: 4,
   currentSet: 1,
 };
-let pomoSetsCount = 4; // パネル上のステージング値
 
 // 休憩モード切替時に退避する値
 let savedTask = '';
@@ -62,11 +61,6 @@ const btnBreak = document.getElementById('btn-break');
 const btnPomo = document.getElementById('btn-pomo');
 const pomoStatusEl = document.getElementById('pomo-status');
 const syncStatusEl = document.getElementById('sync-status');
-const pomoPanel = document.getElementById('pomo-panel');
-const pomoSetsDisplay = document.getElementById('pomo-sets-display');
-const pomoSetsDecBtn = document.getElementById('pomo-sets-dec');
-const pomoSetsIncBtn = document.getElementById('pomo-sets-inc');
-const pomoStartBtn = document.getElementById('pomo-start-btn');
 const taskNameEl = document.getElementById('task-name');
 const iconPlay = document.getElementById('icon-play');
 const iconPause = document.getElementById('icon-pause');
@@ -204,20 +198,7 @@ async function dismissCompletion() {
     clearInterval(completionIntervalId);
     completionIntervalId = null;
   }
-  const overDuration = Math.floor((Date.now() - completionStartTime) / 1000);
-  if (overDuration >= 5) {
-    logs.push({
-      id: Math.random().toString(36).slice(2),
-      task: currentTask || '(タスクなし)',
-      detail: currentDetail || null,
-      duration: overDuration,
-      startedAt: completionStartTime,
-      endedAt: Date.now(),
-      mode: 'countup',
-      isBreak: false,
-    });
-    storageSet('mt_logs', logs);
-  }
+  logOvertimeSession();
   completionStartTime = null;
 
   document.documentElement.classList.remove('completion');
@@ -288,16 +269,8 @@ function exitPomo() {
   btnPomo.classList.remove('active');
 }
 
-function openPomoPanel() {
-  pomoSetsDisplay.textContent = pomoSetsCount;
-  pomoPanel.classList.add('open');
-}
-
-function closePomoPanel() {
-  pomoPanel.classList.add('closing');
-  pomoPanel.addEventListener('animationend', () => {
-    pomoPanel.classList.remove('open', 'closing');
-  }, { once: true });
+async function openPomoWindow() {
+  await window.__TAURI__?.core?.invoke?.('open_pomo_window');
 }
 
 // ── Button handlers ────────────────────────────────────────────────────────
@@ -372,31 +345,17 @@ btnPomo.addEventListener('click', (e) => {
     refreshText();
     draw();
   } else {
-    pomoPanel.classList.contains('open') ? closePomoPanel() : openPomoPanel();
+    await openPomoWindow();
   }
 });
 
-pomoSetsDecBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  pomoSetsCount = Math.max(1, pomoSetsCount - 1);
-  pomoSetsDisplay.textContent = pomoSetsCount;
-});
-
-pomoSetsIncBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  pomoSetsCount = Math.min(12, pomoSetsCount + 1);
-  pomoSetsDisplay.textContent = pomoSetsCount;
-});
-
-pomoStartBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  closePomoPanel();
+function startPomo(sets) {
   if (st.running) logSession();
   if (st.breakMode) exitBreak();
   dismissCompletion();
   // ポモドーロ開始
   pomo.active = true;
-  pomo.totalSets = pomoSetsCount;
+  pomo.totalSets = sets;
   pomo.currentSet = 1;
   st.mode = 'countdown';
   st.total = 25 * 60;
@@ -410,9 +369,7 @@ pomoStartBtn.addEventListener('click', (e) => {
   draw();
   renderPomoStatus();
   btnPomo.classList.add('active');
-});
-
-pomoPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+}
 
 // ── Button handlers ────────────────────────────────────────────────────────
 btnPlay.addEventListener('click', () => {
@@ -479,7 +436,6 @@ btnRecords.addEventListener('click', async () => {
 
 async function openTaskWindow() {
   closeCtxMenu();
-  if (pomoPanel.classList.contains('open')) closePomoPanel();
   if (sheetsPanel.classList.contains('open')) closeSheetsPanel();
   await window.__TAURI__?.core?.invoke?.('open_task_window');
 }
@@ -849,7 +805,6 @@ function applyTaskState(payload = {}) {
 
 circle.addEventListener('click', () => {
   if (completionActive) { dismissCompletion(); return; }
-  if (pomoPanel.classList.contains('open')) closePomoPanel();
 });
 
 // ── Session logging ────────────────────────────────────────────────────────
@@ -870,6 +825,26 @@ function logSession({ sync = true } = {}) {
     endedAt,
     mode: st.mode,
     isBreak: st.breakMode,
+  };
+  logs.push(session);
+  storageSet('mt_logs', logs);
+  if (sync) syncSessionIntegrations(session);
+  return session;
+}
+
+function logOvertimeSession({ sync = true } = {}) {
+  if (completionStartTime === null) return null;
+  const overDuration = Math.floor((Date.now() - completionStartTime) / 1000);
+  if (overDuration < 5) return null;
+  const session = {
+    id: Math.random().toString(36).slice(2),
+    task: currentTask || '(タスクなし)',
+    detail: currentDetail || null,
+    duration: overDuration,
+    startedAt: completionStartTime,
+    endedAt: Date.now(),
+    mode: 'countup',
+    isBreak: false,
   };
   logs.push(session);
   storageSet('mt_logs', logs);
@@ -937,6 +912,9 @@ circle.addEventListener('wheel', (e) => {
   await window.__TAURI__?.event?.listen?.('task-state-changed', ({ payload }) => {
     applyTaskState(payload ?? {});
   }, { target: 'main' });
+  await window.__TAURI__?.event?.listen?.('pomo-start', ({ payload }) => {
+    startPomo(payload?.sets ?? 4);
+  }, { target: 'main' });
 
   const savedTheme = storageGet('mt_theme', '');
   document.body.className = savedTheme;
@@ -953,8 +931,30 @@ circle.addEventListener('wheel', (e) => {
   if (savedPos) {
     await window.__TAURI__?.core?.invoke?.('set_window_position', { x: savedPos[0], y: savedPos[1] });
   }
+  // デフォルトで前面固定
+  btnPin.classList.add('pinned');
+  await tauriWin()?.setAlwaysOnTop(true);
+
   // 停止状態で起動するため rAF は使わず、時計のみ定期更新
   clockTickInterval = setInterval(() => {
     clockEl.textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
   }, 30_000);
 })();
+
+// ── Cursor passthrough for transparent corners ──────────────────────
+// 円の外（透明コーナー部分）ではクリックを背後のウィンドウに通す
+let _cursorPassthrough = false;
+document.addEventListener('mousemove', (e) => {
+  const rect = circle.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const r  = rect.width / 2;
+  const inCircle = (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
+  const shouldPassthrough = !inCircle;
+  if (shouldPassthrough !== _cursorPassthrough) {
+    _cursorPassthrough = shouldPassthrough;
+    window.__TAURI__?.core?.invoke?.('set_cursor_passthrough', { ignore: shouldPassthrough });
+  }
+});

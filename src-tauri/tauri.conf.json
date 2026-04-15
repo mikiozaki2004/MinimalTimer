@@ -41,6 +41,18 @@
         "transparent": true,
         "shadow":      false,
         "visible":     false
+      },
+      {
+        "label":       "pomo",
+        "url":         "pomo.html",
+        "title":       "ポモドーロ",
+        "width":       240,
+        "height":      160,
+        "resizable":   false,
+        "decorations": false,
+        "transparent": true,
+        "shadow":      false,
+        "visible":     false
       }
     ],
     "security": {

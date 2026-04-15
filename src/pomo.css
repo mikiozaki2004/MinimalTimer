@@ -1,0 +1,148 @@
+/* ── Reset ──────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Root ───────────────────────────────────────────────────── */
+:root {
+  --bg:     rgba(13, 17, 23, 0.97);
+  --border: rgba(255, 255, 255, 0.10);
+  --ring:   #58A6FF;
+  --fg:     #E6EDF3;
+  --fg-dim: rgba(230, 237, 243, 0.40);
+  --radius: 14px;
+}
+
+html, body {
+  width:  240px;
+  height: 160px;
+  overflow: hidden;
+  background: transparent;
+  border-radius: var(--radius);
+}
+
+/* ── Card ───────────────────────────────────────────────────── */
+.card {
+  width:  240px;
+  height: 160px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.header-title {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 1.5px;
+  color: var(--fg);
+  opacity: 0.5;
+}
+
+.close-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--fg);
+  opacity: 0.35;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.close-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Body ───────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px 20px 14px;
+}
+
+/* ── Sets row ───────────────────────────────────────────────── */
+.sets-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sets-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sets-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sets-count {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 300;
+  color: var(--fg);
+  min-width: 28px;
+  text-align: center;
+}
+
+.sets-label {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  color: var(--fg);
+  opacity: 0.5;
+}
+
+/* ── Start button ───────────────────────────────────────────── */
+.start-btn {
+  background: var(--ring);
+  border: none;
+  color: #0d1117;
+  cursor: pointer;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 32px;
+  border-radius: 20px;
+  opacity: 0.9;
+  transition: opacity 0.15s;
+}
+.start-btn:hover {
+  opacity: 1;
+}

@@ -3,12 +3,15 @@ use std::{
     fs,
     path::Path,
     process::Command,
-    sync::Mutex,
+    sync::{atomic::{AtomicBool, Ordering}, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+
+/// カーソルがメインウィンドウの円外にある間、マウスイベントを透過させるフラグ
+static CURSOR_PASSTHROUGH: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,7 +28,11 @@ struct IntegrationRecord {
 
 const TASK_WINDOW_WIDTH: f64 = 300.0;
 const TASK_WINDOW_HEIGHT: f64 = 400.0;
-const TASK_WINDOW_GAP: f64 = 16.0;
+const RECORDS_WINDOW_WIDTH: f64 = 480.0;
+const RECORDS_WINDOW_HEIGHT: f64 = 660.0;
+const POMO_WINDOW_WIDTH: f64 = 240.0;
+const POMO_WINDOW_HEIGHT: f64 = 160.0;
+const WINDOW_GAP: f64 = 16.0;
 
 fn clamp_position(value: f64, min: f64, max: f64) -> f64 {
     if max <= min {
@@ -35,7 +42,7 @@ fn clamp_position(value: f64, min: f64, max: f64) -> f64 {
     }
 }
 
-fn position_task_window_near_main(app: &tauri::AppHandle, task_win: &tauri::WebviewWindow) {
+fn position_window_near_main(app: &tauri::AppHandle, win: &tauri::WebviewWindow, win_w: f64, win_h: f64) {
     let Some(main_win) = app.get_webview_window("main") else {
         return;
     };
@@ -59,12 +66,12 @@ fn position_task_window_near_main(app: &tauri::AppHandle, task_win: &tauri::Webv
     let main_w = main_size.width as f64 / scale;
     let main_h = main_size.height as f64 / scale;
 
-    let right_x = main_x + main_w + TASK_WINDOW_GAP;
-    let left_x = main_x - TASK_WINDOW_WIDTH - TASK_WINDOW_GAP;
-    let centered_x = main_x + (main_w - TASK_WINDOW_WIDTH) / 2.0;
-    let centered_y = main_y + (main_h - TASK_WINDOW_HEIGHT) / 2.0;
-    let max_x = monitor_x + monitor_w - TASK_WINDOW_WIDTH;
-    let max_y = monitor_y + monitor_h - TASK_WINDOW_HEIGHT;
+    let right_x = main_x + main_w + WINDOW_GAP;
+    let left_x = main_x - win_w - WINDOW_GAP;
+    let centered_x = main_x + (main_w - win_w) / 2.0;
+    let centered_y = main_y + (main_h - win_h) / 2.0;
+    let max_x = monitor_x + monitor_w - win_w;
+    let max_y = monitor_y + monitor_h - win_h;
 
     let x = if right_x <= max_x {
         right_x
@@ -75,7 +82,11 @@ fn position_task_window_near_main(app: &tauri::AppHandle, task_win: &tauri::Webv
     };
     let y = clamp_position(centered_y, monitor_y, max_y);
 
-    let _ = task_win.set_position(tauri::LogicalPosition::new(x, y));
+    let _ = win.set_position(tauri::LogicalPosition::new(x, y));
+}
+
+fn position_task_window_near_main(app: &tauri::AppHandle, task_win: &tauri::WebviewWindow) {
+    position_window_near_main(app, task_win, TASK_WINDOW_WIDTH, TASK_WINDOW_HEIGHT);
 }
 
 /// records ウィンドウを取得または再作成して返す
@@ -83,6 +94,7 @@ fn get_or_create_records(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow>
     // 既存のウィンドウがあればそれを返す
     if let Some(win) = app.get_webview_window("records") {
         let _ = win.eval("window.refreshRecords && window.refreshRecords()");
+        position_window_near_main(app, &win, RECORDS_WINDOW_WIDTH, RECORDS_WINDOW_HEIGHT);
         let _ = win.show();
         let _ = win.set_focus();
         return Some(win);
@@ -95,7 +107,7 @@ fn get_or_create_records(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow>
         WebviewUrl::App("records.html".into()),
     )
     .title("記録")
-    .inner_size(480.0, 660.0)
+    .inner_size(RECORDS_WINDOW_WIDTH, RECORDS_WINDOW_HEIGHT)
     .resizable(false)
     .decorations(false)
     .transparent(true)
@@ -103,6 +115,7 @@ fn get_or_create_records(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow>
     .build()
     .ok()
     .map(|win| {
+        position_window_near_main(app, &win, RECORDS_WINDOW_WIDTH, RECORDS_WINDOW_HEIGHT);
         let _ = win.set_focus();
         win
     })
@@ -144,6 +157,36 @@ fn open_task_window(app: tauri::AppHandle) {
     get_or_create_task(&app);
 }
 
+/// pomo ウィンドウを取得または再作成して返す
+fn get_or_create_pomo(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    if let Some(win) = app.get_webview_window("pomo") {
+        position_window_near_main(app, &win, POMO_WINDOW_WIDTH, POMO_WINDOW_HEIGHT);
+        let _ = win.show();
+        let _ = win.set_focus();
+        return Some(win);
+    }
+
+    WebviewWindowBuilder::new(app, "pomo", WebviewUrl::App("pomo.html".into()))
+        .title("ポモドーロ")
+        .inner_size(POMO_WINDOW_WIDTH, POMO_WINDOW_HEIGHT)
+        .resizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .build()
+        .ok()
+        .map(|win| {
+            position_window_near_main(app, &win, POMO_WINDOW_WIDTH, POMO_WINDOW_HEIGHT);
+            let _ = win.set_focus();
+            win
+        })
+}
+
+#[tauri::command]
+fn open_pomo_window(app: tauri::AppHandle) {
+    get_or_create_pomo(&app);
+}
+
 #[tauri::command]
 fn open_records_devtools(app: tauri::AppHandle) {
     if let Some(win) = get_or_create_records(&app) {
@@ -159,6 +202,38 @@ fn hide_records(app: tauri::AppHandle) {
   if let Some(win) = app.get_webview_window("records") {
     let _ = win.hide();
   }
+}
+
+// ── Cursor passthrough (transparent corner click-through) ─────────
+
+/// カーソルがメインウィンドウの円内にあるか判定（物理ピクセル座標で比較）
+#[cfg(target_os = "windows")]
+fn cursor_in_circle(win: &tauri::WebviewWindow) -> bool {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+
+    let mut pt = POINT { x: 0, y: 0 };
+    if unsafe { GetCursorPos(&mut pt) } == 0 {
+        return false;
+    }
+    let Ok(pos)  = win.outer_position() else { return false };
+    let Ok(size) = win.outer_size()     else { return false };
+
+    let w        = size.width as f64;
+    let center_x = pos.x as f64 + w / 2.0;
+    let center_y = pos.y as f64 + w / 2.0; // ウィンドウは正方形
+    let radius   = w / 2.0;
+    let dx = pt.x as f64 - center_x;
+    let dy = pt.y as f64 - center_y;
+    dx * dx + dy * dy <= radius * radius
+}
+
+#[tauri::command]
+fn set_cursor_passthrough(app: tauri::AppHandle, ignore: bool) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_ignore_cursor_events(ignore);
+        CURSOR_PASSTHROUGH.store(ignore, Ordering::Relaxed);
+    }
 }
 
 // ── Completion notification ────────────────────────────────────────
@@ -410,9 +485,31 @@ fn run_excel_append_script(_workbook_path: &str, _json_path: &str) -> Result<(),
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
+        .setup(|app| {
+            // 円外の透明部分でクリックが通らない問題の対策:
+            // JS が passthrough=true にした後、カーソルが円に戻ったことを
+            // Win32 GetCursorPos でポーリングして検知し、cursor events を再有効化する
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(32));
+                    #[cfg(target_os = "windows")]
+                    if CURSOR_PASSTHROUGH.load(Ordering::Relaxed) {
+                        if let Some(win) = app_handle.get_webview_window("main") {
+                            if cursor_in_circle(&win) {
+                                let _ = win.set_ignore_cursor_events(false);
+                                CURSOR_PASSTHROUGH.store(false, Ordering::Relaxed);
+                            }
+                        }
+                    }
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             open_records,
             open_task_window,
+            open_pomo_window,
             open_records_devtools,
             hide_records,
             notify_completion,
@@ -421,6 +518,7 @@ pub fn run() {
             get_window_position,
             set_window_position,
             append_excel_records,
+            set_cursor_passthrough,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -429,6 +527,9 @@ pub fn run() {
                     api.prevent_close();
                     let _ = window.hide();
                 } else if window.label() == "task" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                } else if window.label() == "pomo" {
                     api.prevent_close();
                     let _ = window.hide();
                 } else if window.label() == "main" {

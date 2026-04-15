@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="pomo.css">
+  <title>ポモドーロ</title>
+</head>
+<body>
+  <div class="card">
+    <div class="header" data-tauri-drag-region>
+      <span class="header-title">ポモドーロ</span>
+      <button class="close-btn" id="close-btn" title="閉じる" type="button">✕</button>
+    </div>
+
+    <div class="body">
+      <div class="sets-row">
+        <button class="sets-btn" id="sets-dec" type="button">−</button>
+        <span class="sets-count" id="sets-display">4</span>
+        <span class="sets-label">セット</span>
+        <button class="sets-btn" id="sets-inc" type="button">＋</button>
+      </div>
+      <button class="start-btn" id="start-btn" type="button">開始</button>
+    </div>
+  </div>
+  <script src="pomo.js" type="module"></script>
+</body>
+</html>
