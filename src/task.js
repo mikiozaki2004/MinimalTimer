@@ -266,6 +266,7 @@ function render() {
   });
 }
 
+closeBtnEl.addEventListener('mousedown', (e) => e.stopPropagation());
 closeBtnEl.addEventListener('click', () => {
   void window.__TAURI__?.window?.getCurrentWindow?.()?.hide?.();
 });
@@ -294,6 +295,17 @@ taskListEl.addEventListener('mousedown', (e) => e.stopPropagation());
   loadState();
   render();
   addInputEl.focus();
+
+  // メインウィンドウのテーマに合わせる（起動時）
+  try {
+    const savedTheme = localStorage.getItem('mt_theme');
+    if (savedTheme) document.body.className = savedTheme;
+  } catch {}
+
+  // テーマ変更をリアルタイムで追従
+  void window.__TAURI__?.event?.listen?.('theme-changed', ({ payload }) => {
+    document.body.className = payload?.theme ?? '';
+  }, { target: 'task' });
 })();
 
 window.refreshTasks = () => {

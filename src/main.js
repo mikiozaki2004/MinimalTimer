@@ -330,7 +330,7 @@ btnBreak.addEventListener('click', () => {
 });
 
 // ── Pomodoro button & panel handlers ───────────────────────────────────────
-btnPomo.addEventListener('click', (e) => {
+btnPomo.addEventListener('click', async (e) => {
   e.stopPropagation();
   if (pomo.active) {
     // ポモドーロ停止
@@ -421,6 +421,8 @@ btnTheme.addEventListener('click', () => {
   st.themeIdx = (st.themeIdx + 1) % THEMES.length;
   document.body.className = THEMES[st.themeIdx];
   storageSet('mt_theme', THEMES[st.themeIdx]);
+  void window.__TAURI__?.event?.emitTo?.('pomo', 'theme-changed', { theme: THEMES[st.themeIdx] });
+  void window.__TAURI__?.event?.emitTo?.('task', 'theme-changed', { theme: THEMES[st.themeIdx] });
 });
 
 btnPin.addEventListener('click', async () => {
@@ -873,7 +875,10 @@ async function syncToLocalExcel(session) {
 
 // ── Save session on exit ───────────────────────────────────────────────────
 window.__saveSessionOnExit = async () => {
-  if (st.running) {
+  if (completionActive) {
+    const session = logOvertimeSession({ sync: false });
+    if (session) await syncSessionIntegrations(session);
+  } else if (st.running) {
     const session = logSession({ sync: false });
     if (session) await syncSessionIntegrations(session);
   }

@@ -29,7 +29,7 @@ struct IntegrationRecord {
 const TASK_WINDOW_WIDTH: f64 = 300.0;
 const TASK_WINDOW_HEIGHT: f64 = 400.0;
 const RECORDS_WINDOW_WIDTH: f64 = 480.0;
-const RECORDS_WINDOW_HEIGHT: f64 = 660.0;
+const RECORDS_WINDOW_HEIGHT: f64 = 640.0;
 const POMO_WINDOW_WIDTH: f64 = 240.0;
 const POMO_WINDOW_HEIGHT: f64 = 160.0;
 const WINDOW_GAP: f64 = 16.0;
@@ -70,8 +70,10 @@ fn position_window_near_main(app: &tauri::AppHandle, win: &tauri::WebviewWindow,
     let left_x = main_x - win_w - WINDOW_GAP;
     let centered_x = main_x + (main_w - win_w) / 2.0;
     let centered_y = main_y + (main_h - win_h) / 2.0;
+    // タスクバー分のマージンを確保（Windows 11 タスクバーは約 48px）
+    let taskbar_margin = 60.0;
     let max_x = monitor_x + monitor_w - win_w;
-    let max_y = monitor_y + monitor_h - win_h;
+    let max_y = (monitor_y + monitor_h - win_h - taskbar_margin).max(monitor_y);
 
     let x = if right_x <= max_x {
         right_x
@@ -162,6 +164,7 @@ fn get_or_create_pomo(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
     if let Some(win) = app.get_webview_window("pomo") {
         position_window_near_main(app, &win, POMO_WINDOW_WIDTH, POMO_WINDOW_HEIGHT);
         let _ = win.show();
+        let _ = win.set_always_on_top(true);
         let _ = win.set_focus();
         return Some(win);
     }
@@ -177,6 +180,7 @@ fn get_or_create_pomo(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
         .ok()
         .map(|win| {
             position_window_near_main(app, &win, POMO_WINDOW_WIDTH, POMO_WINDOW_HEIGHT);
+            let _ = win.set_always_on_top(true);
             let _ = win.set_focus();
             win
         })

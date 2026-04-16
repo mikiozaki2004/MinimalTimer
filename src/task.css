@@ -216,3 +216,20 @@ html, body {
   transition: opacity 0.15s;
 }
 .add-btn:hover { opacity: 1; }
+
+/* ── Themes ─────────────────────────────────────────────────── */
+body.light {
+  --bg:     rgba(245, 245, 240, 0.95);
+  --border: rgba(0, 0, 0, 0.10);
+  --ring:   #2563EB;
+  --fg:     #1E293B;
+  --fg-dim: rgba(30, 41, 59, 0.40);
+}
+
+body.sunset {
+  --bg:     rgba(26, 26, 46, 0.88);
+  --border: rgba(255, 255, 255, 0.10);
+  --ring:   #E94560;
+  --fg:     #EAEAEA;
+  --fg-dim: rgba(234, 234, 234, 0.40);
+}

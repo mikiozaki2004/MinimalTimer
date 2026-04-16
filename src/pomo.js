@@ -7,6 +7,12 @@ const closeBtn = document.getElementById('close-btn');
 const STORAGE_KEY = 'mt_pomo_sets';
 const DEFAULT_SETS = 4;
 
+// メインウィンドウのテーマに合わせる
+try {
+  const savedTheme = localStorage.getItem('mt_theme');
+  if (savedTheme) document.body.className = savedTheme;
+} catch {}
+
 let setsCount = (() => {
   try {
     const v = parseInt(localStorage.getItem(STORAGE_KEY), 10);
@@ -47,3 +53,8 @@ closeBtn.addEventListener('click', () => {
 });
 
 render();
+
+// メインウィンドウのテーマ変更をリアルタイムで追従
+void window.__TAURI__?.event?.listen?.('theme-changed', ({ payload }) => {
+  document.body.className = payload?.theme ?? '';
+}, { target: 'pomo' });
