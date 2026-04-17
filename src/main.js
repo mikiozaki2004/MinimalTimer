@@ -1,4 +1,5 @@
 import { initStorage, storageGet, storageSet } from './store.js';
+import { initWater, resetWater, ensureLoop as waterEnsureLoop } from './water.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const CIRCUMFERENCE = 2 * Math.PI * 126;
@@ -65,6 +66,12 @@ const taskNameEl = document.getElementById('task-name');
 const iconPlay = document.getElementById('icon-play');
 const iconPause = document.getElementById('icon-pause');
 
+// ── Water animation ────────────────────────────────────────────────────────
+initWater(
+  document.getElementById('water-canvas'),
+  () => ({ fill: Math.min(1, st.elapsed / st.total), running: st.running }),
+);
+
 // ── Tauri window API ───────────────────────────────────────────────────────
 function tauriWin() {
   return window.__TAURI__?.window?.getCurrentWindow?.();
@@ -79,6 +86,11 @@ function draw() {
     ratio = (st.elapsed % 3600) / 3600;
   }
   ringEl.style.strokeDashoffset = CIRCUMFERENCE * (1 - ratio);
+  if (st.mode === 'countdown' && !st.breakMode && st.elapsed > 0.01) {
+    waterEnsureLoop();
+  } else if (st.elapsed <= 0.01) {
+    resetWater();
+  }
 }
 
 // ── Text refresh ───────────────────────────────────────────────────────────
@@ -200,6 +212,8 @@ async function dismissCompletion() {
   }
   logOvertimeSession();
   completionStartTime = null;
+  st.elapsed = 0;
+  st.sessionStart = null;
 
   document.documentElement.classList.remove('completion');
   await window.__TAURI__?.core?.invoke?.('dismiss_completion');
