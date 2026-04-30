@@ -342,6 +342,87 @@ body.sunset .cal-cell.selected {
   letter-spacing: -0.5px;
 }
 
+/* ── Day timeline ────────────────────────────────────────────────── */
+.day-timeline {
+  padding: 2px 20px 10px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.tl-track {
+  position: relative;
+  height: 22px;
+  background: var(--bg2);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.tl-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
+.tl-block {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.12s, transform 0.12s;
+  min-width: 2px;
+}
+
+.tl-block:hover {
+  opacity: 1;
+  transform: scaleY(1.08);
+  z-index: 2;
+}
+
+.tl-block.break {
+  opacity: 0.55;
+}
+
+.tl-labels {
+  position: relative;
+  height: 14px;
+  margin-top: 4px;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 10px;
+  color: var(--fg);
+}
+
+.tl-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  opacity: 0.4;
+  white-space: nowrap;
+}
+
+.tl-label:first-child { transform: translateX(0); }
+.tl-label:last-child  { transform: translateX(-100%); }
+
+.tl-tooltip {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  color: var(--fg);
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.40);
+  opacity: 0.97;
+}
+
 /* ── Task bars ───────────────────────────────────────────────────── */
 .task-bars {
   padding: 0 20px 8px;

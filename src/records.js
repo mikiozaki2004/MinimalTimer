@@ -17,6 +17,7 @@ const headerMonth    = document.getElementById('header-month');
 const headerTotal    = document.getElementById('header-total');
 const dayDetailHeader = document.getElementById('day-detail-header');
 const taskBarsEl     = document.getElementById('task-bars');
+const timelineEl     = document.getElementById('day-timeline');
 const detailSep      = document.getElementById('detail-sep');
 const sessionList    = document.getElementById('session-list');
 const addInlineBtn   = document.getElementById('add-inline-btn');
@@ -47,6 +48,13 @@ function fmtTime(ms) {
   if (!ms) return '--:--';
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function taskColor(name, isBreak) {
+  if (isBreak) return 'rgba(74, 222, 128, 0.55)';
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360}, 60%, 58%)`;
 }
 
 function taskFontSize(text) {
@@ -249,6 +257,9 @@ function renderDayDetail(dateStr) {
     dayDetailHeader.appendChild(totalSpan);
   }
 
+  // ── タイムライン ──
+  renderTimeline(dateStr, sessions);
+
   // ── タスクバー集計 ──
   taskBarsEl.innerHTML = '';
   const taskTotals = {};
@@ -327,6 +338,94 @@ function renderDayDetail(dateStr) {
       sessionList.appendChild(row);
     });
   }
+}
+
+// ── Render Timeline ────────────────────────────────────────────────────────
+function renderTimeline(dateStr, sessions) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dayStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
+  const dayEnd   = dayStart + 86400000;
+  const totalMs  = 86400000;
+
+  timelineEl.innerHTML = '';
+
+  const track = document.createElement('div');
+  track.className = 'tl-track';
+
+  // 6時間ごとの目盛り線
+  for (let h = 6; h < 24; h += 6) {
+    const tick = document.createElement('div');
+    tick.className = 'tl-tick';
+    tick.style.left = `${(h / 24) * 100}%`;
+    track.appendChild(tick);
+  }
+
+  // セッションブロック
+  sessions.forEach((l) => {
+    const endMs   = l.endedAt ?? l.timestamp;
+    const startMs = l.startedAt ?? (endMs - l.duration * 1000);
+    const s = Math.max(startMs, dayStart);
+    const e = Math.min(endMs, dayEnd);
+    if (e <= s) return;
+
+    const leftPct  = ((s - dayStart) / totalMs) * 100;
+    const widthPct = ((e - s) / totalMs) * 100;
+    const taskLabel = l.detail ? `${l.task} / ${l.detail}` : l.task;
+
+    const block = document.createElement('div');
+    block.className = 'tl-block' + (l.isBreak ? ' break' : '');
+    block.style.left = `${leftPct}%`;
+    block.style.width = `${Math.max(widthPct, 0.25)}%`;
+    block.style.background = taskColor(l.task || '', l.isBreak);
+
+    const tip = `${fmtTime(startMs)} → ${fmtTime(endMs)}　${l.isBreak ? '☕ ' : ''}${taskLabel}　(${fmtDuration(l.duration)})`;
+    block.addEventListener('mouseenter', (ev) => showTooltip(ev, tip));
+    block.addEventListener('mousemove', (ev) => moveTooltip(ev));
+    block.addEventListener('mouseleave', hideTooltip);
+    track.appendChild(block);
+  });
+
+  timelineEl.appendChild(track);
+
+  // 時刻ラベル
+  const labels = document.createElement('div');
+  labels.className = 'tl-labels';
+  [0, 6, 12, 18, 24].forEach((h) => {
+    const lab = document.createElement('span');
+    lab.className = 'tl-label';
+    lab.style.left = `${(h / 24) * 100}%`;
+    lab.textContent = `${h}:00`;
+    labels.appendChild(lab);
+  });
+  timelineEl.appendChild(labels);
+}
+
+let tooltipEl = null;
+function ensureTooltip() {
+  if (tooltipEl) return tooltipEl;
+  tooltipEl = document.createElement('div');
+  tooltipEl.className = 'tl-tooltip hidden';
+  document.body.appendChild(tooltipEl);
+  return tooltipEl;
+}
+function showTooltip(ev, text) {
+  const tip = ensureTooltip();
+  tip.textContent = text;
+  tip.classList.remove('hidden');
+  moveTooltip(ev);
+}
+function moveTooltip(ev) {
+  const tip = ensureTooltip();
+  const pad = 12;
+  let x = ev.clientX + pad;
+  let y = ev.clientY - tip.offsetHeight - pad;
+  if (x + tip.offsetWidth > window.innerWidth - 4) x = window.innerWidth - tip.offsetWidth - 4;
+  if (y < 4) y = ev.clientY + pad;
+  tip.style.left = `${x}px`;
+  tip.style.top  = `${y}px`;
+}
+function hideTooltip() {
+  if (tooltipEl) tooltipEl.classList.add('hidden');
 }
 
 // ── Delete Session ────────────────────────────────────────────────────────────
