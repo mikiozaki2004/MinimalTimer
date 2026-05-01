@@ -4,6 +4,7 @@ import { initStorage, storageGet, storageSet } from './store.js';
 let logs = [];
 let viewYear = new Date().getFullYear();
 let viewMonth = new Date().getMonth(); // 0-based
+const MAX_HEAT_SECONDS = 12 * 60 * 60;
 
 function todayStr() {
   const d = new Date();
@@ -114,12 +115,11 @@ function getMonthData(year, month) {
   return result;
 }
 
-function heatLevel(sec) {
-  if (sec <= 0)    return 0;
-  if (sec < 1800)  return 1; // ~30分
-  if (sec < 3600)  return 2; // ~1時間
-  if (sec < 10800) return 3; // ~3時間
-  return 4;
+function heatAlpha(sec) {
+  if (sec <= 0) return 0;
+  const ratio = Math.min(sec / MAX_HEAT_SECONDS, 1);
+  const eased = Math.sqrt(ratio);
+  return 0.08 + eased * 0.67;
 }
 
 // ── Render Calendar ──────────────────────────────────────────────────────────
@@ -160,13 +160,16 @@ function renderCalendar() {
     const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const data = monthMap.get(dateStr);
     const sec  = data?.sec ?? 0;
-    const level = heatLevel(sec);
+    const alpha = heatAlpha(sec);
     const dow   = (startOffset + day - 1) % 7; // 0=月, 5=土, 6=日
 
     const cell = document.createElement('div');
     cell.className = 'cal-cell';
     cell.dataset.date = dateStr;
-    if (level > 0) cell.classList.add(`heat-${level}`);
+    if (alpha > 0) {
+      cell.classList.add('has-heat');
+      cell.style.setProperty('--heat-alpha', alpha.toFixed(3));
+    }
     if (dateStr === today) cell.classList.add('today');
     if (dateStr === selectedDate) cell.classList.add('selected');
     if (dow === 5) cell.classList.add('sat');
@@ -458,6 +461,51 @@ document.getElementById('add-end').addEventListener('input', updateDurationPrevi
 addInlineBtn.addEventListener('click', openAddForm);
 document.getElementById('add-cancel-btn').addEventListener('click', closeAddForm);
 document.getElementById('add-submit-btn').addEventListener('click', submitAddForm);
+
+// ── Excel Export ──────────────────────────────────────────────────────────────
+function sessionToExportRecord(session) {
+  const { task, detail, duration, endedAt, timestamp, startedAt } = session;
+  const endMs = endedAt ?? timestamp;
+  const startMs = startedAt ?? (endMs - duration * 1000);
+  const d = new Date(endMs);
+  const pad = n => String(n).padStart(2, '0');
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    task: task || '(タスクなし)',
+    detail: detail || '',
+    startTime: `${pad(new Date(startMs).getHours())}:${pad(new Date(startMs).getMinutes())}`,
+    endTime: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    durationMin: Math.round(duration / 60 * 10) / 10,
+    isBreak: Boolean(session.isBreak),
+  };
+}
+
+const exportExcelBtn = document.getElementById('export-excel-btn');
+const exportStatus   = document.getElementById('export-status');
+
+exportExcelBtn.addEventListener('click', async () => {
+  if (logs.length === 0) {
+    exportStatus.textContent = '記録がありません';
+    setTimeout(() => { exportStatus.textContent = ''; }, 3000);
+    return;
+  }
+  exportExcelBtn.disabled = true;
+  exportStatus.textContent = '出力中...';
+  const records = logs.map(sessionToExportRecord);
+  try {
+    const savedPath = await window.__TAURI__?.core?.invoke?.('export_excel_records', { records });
+    if (savedPath) {
+      exportStatus.textContent = '✓ 出力完了';
+    } else {
+      exportStatus.textContent = 'キャンセルしました';
+    }
+  } catch (err) {
+    exportStatus.textContent = `エラー: ${String(err)}`;
+  } finally {
+    exportExcelBtn.disabled = false;
+    setTimeout(() => { exportStatus.textContent = ''; }, 4000);
+  }
+});
 
 // ── Close ─────────────────────────────────────────────────────────────────────
 closeBtn.addEventListener('mousedown', e => e.stopPropagation());

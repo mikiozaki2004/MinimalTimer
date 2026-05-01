@@ -18,11 +18,7 @@
   --fg: #E6EDF3;
   --fg-dim: rgba(230, 237, 243, 0.45);
   --radius: 20px;
-  /* ヒートマップ */
-  --heat-1: rgba(88, 166, 255, 0.12);
-  --heat-2: rgba(88, 166, 255, 0.28);
-  --heat-3: rgba(88, 166, 255, 0.50);
-  --heat-4: rgba(88, 166, 255, 0.75);
+  --heat-rgb: 88, 166, 255;
 }
 
 body.light {
@@ -32,10 +28,7 @@ body.light {
   --ring: #2563EB;
   --fg: #1E293B;
   --fg-dim: rgba(30, 41, 59, 0.45);
-  --heat-1: rgba(37, 99, 235, 0.08);
-  --heat-2: rgba(37, 99, 235, 0.20);
-  --heat-3: rgba(37, 99, 235, 0.38);
-  --heat-4: rgba(37, 99, 235, 0.62);
+  --heat-rgb: 37, 99, 235;
 }
 
 body.sunset {
@@ -45,10 +38,7 @@ body.sunset {
   --ring: #E94560;
   --fg: #EAEAEA;
   --fg-dim: rgba(234, 234, 234, 0.45);
-  --heat-1: rgba(233, 69, 96, 0.12);
-  --heat-2: rgba(233, 69, 96, 0.28);
-  --heat-3: rgba(233, 69, 96, 0.50);
-  --heat-4: rgba(233, 69, 96, 0.75);
+  --heat-rgb: 233, 69, 96;
 }
 
 /* ── Utility ──────────────────────────────────────────────────────── */
@@ -57,7 +47,7 @@ body.sunset {
 /* ── Window ──────────────────────────────────────────────────────── */
 html {
   width: 480px;
-  height: 660px;
+  height: 640px;
   overflow: hidden;
   border-radius: var(--radius);
   background: transparent;
@@ -65,7 +55,7 @@ html {
 
 body {
   width: 480px;
-  height: 660px;
+  height: 640px;
   overflow: hidden;
   background: transparent;
   border-radius: var(--radius);
@@ -74,7 +64,7 @@ body {
 .card {
   position: relative;
   width: 480px;
-  height: 660px;
+  height: 640px;
   background: var(--bg);
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -241,11 +231,10 @@ body {
   pointer-events: none;
 }
 
-/* Heatmap levels */
-.cal-cell.heat-1 { background: var(--heat-1); }
-.cal-cell.heat-2 { background: var(--heat-2); }
-.cal-cell.heat-3 { background: var(--heat-3); }
-.cal-cell.heat-4 { background: var(--heat-4); }
+/* Heatmap intensity */
+.cal-cell.has-heat {
+  background: rgba(var(--heat-rgb), var(--heat-alpha, 0));
+}
 
 /* Today */
 .cal-cell.today .cal-date {
@@ -539,6 +528,51 @@ body.sunset .session-row.break .session-dur  { color: #34D399; }
   opacity: 0.85;
   border-color: var(--ring);
   color: var(--ring);
+}
+
+/* ── Records footer ──────────────────────────────────────────────── */
+.records-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.export-excel-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--fg);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  opacity: 0.35;
+  cursor: pointer;
+  padding: 5px 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.export-excel-btn:hover {
+  opacity: 0.85;
+  border-color: var(--ring);
+  color: var(--ring);
+}
+
+.export-excel-btn:disabled {
+  opacity: 0.15;
+  cursor: default;
+  pointer-events: none;
+}
+
+.export-status {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  color: var(--fg);
+  opacity: 0.5;
 }
 
 /* ── Add entry form ──────────────────────────────────────────────── */

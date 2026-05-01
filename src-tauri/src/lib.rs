@@ -257,9 +257,44 @@ fn get_window_position(app: tauri::AppHandle) -> Option<[f64; 2]> {
 
 #[tauri::command]
 fn set_window_position(app: tauri::AppHandle, x: f64, y: f64) {
-    if let Some(win) = app.get_webview_window("main") {
-        let _ = win.set_position(tauri::LogicalPosition::new(x, y));
-    }
+    let Some(win) = app.get_webview_window("main") else { return };
+
+    // 前回保存した座標が現在のモニタ構成で画面外の場合
+    // (外部モニタを外した／解像度が変わった等)、プライマリモニタ中央に復帰させる
+    let monitors = app.available_monitors().unwrap_or_default();
+    const VISIBLE_MARGIN: f64 = 64.0;
+    let in_bounds = monitors.iter().any(|m| {
+        let s = m.scale_factor();
+        let mx = m.position().x as f64 / s;
+        let my = m.position().y as f64 / s;
+        let mw = m.size().width as f64 / s;
+        let mh = m.size().height as f64 / s;
+        x + VISIBLE_MARGIN > mx
+            && x < mx + mw - VISIBLE_MARGIN
+            && y + VISIBLE_MARGIN > my
+            && y < my + mh - VISIBLE_MARGIN
+    });
+
+    let (fx, fy) = if in_bounds {
+        (x, y)
+    } else if let Some(m) = app
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| monitors.first().cloned())
+    {
+        let s = m.scale_factor();
+        let mx = m.position().x as f64 / s;
+        let my = m.position().y as f64 / s;
+        let mw = m.size().width as f64 / s;
+        let mh = m.size().height as f64 / s;
+        let size = *CURRENT_SIZE.lock().unwrap();
+        (mx + (mw - size) / 2.0, my + (mh - size) / 2.0)
+    } else {
+        (x, y)
+    };
+
+    let _ = win.set_position(tauri::LogicalPosition::new(fx, fy));
 }
 
 #[tauri::command]
@@ -485,6 +520,139 @@ fn run_excel_append_script(_workbook_path: &str, _json_path: &str) -> Result<(),
     Err("ローカルExcel追記はWindows版のみ対応しています".into())
 }
 
+#[tauri::command]
+async fn export_excel_records(records: Vec<IntegrationRecord>) -> Result<String, String> {
+    if records.is_empty() {
+        return Err("エクスポートする記録がありません".into());
+    }
+
+    let json = serde_json::to_string(&records).map_err(|e| e.to_string())?;
+    let temp_path = std::env::temp_dir().join(format!(
+        "minimal_timer_export_{}_{}.json",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_millis()
+    ));
+
+    fs::write(&temp_path, json).map_err(|e| e.to_string())?;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let r = run_excel_export_script(temp_path.to_string_lossy().as_ref());
+        let _ = fs::remove_file(&temp_path);
+        r
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    result
+}
+
+#[cfg(target_os = "windows")]
+fn run_excel_export_script(json_path: &str) -> Result<String, String> {
+    let script = r#"
+param([string]$jsonPath)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.SaveFileDialog
+$dialog.Filter = "Excel ファイル (*.xlsx)|*.xlsx"
+$dialog.FileName = "MinimalTimer_作業記録_$(Get-Date -Format 'yyyyMMdd').xlsx"
+$dialog.Title = "エクスポート先を選択"
+$r = $dialog.ShowDialog()
+if ($r -ne [System.Windows.Forms.DialogResult]::OK) {
+    Write-Output ""
+    exit 0
+}
+$savePath = $dialog.FileName
+$records = Get-Content -LiteralPath $jsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($null -eq $records) { $records = @() }
+if ($records -isnot [System.Array]) { $records = @($records) }
+$excel = New-Object -ComObject Excel.Application
+$excel.Visible = $false
+$excel.DisplayAlerts = $false
+$wb = $null
+$ws = $null
+$table = $null
+try {
+  $wb = $excel.Workbooks.Add()
+  $ws = $wb.ActiveSheet
+  $ws.Name = "作業記録"
+  $headers = @("日付", "タスク", "詳細", "開始", "終了", "時間(分)", "休憩")
+  for ($i = 0; $i -lt $headers.Count; $i++) {
+    $ws.Cells.Item(1, $i + 1).Value2 = $headers[$i]
+  }
+  $range = $ws.Range("A1:G1")
+  $table = $ws.ListObjects.Add(1, $range, $null, 1)
+  $table.Name = "WorkLogs"
+  $table.TableStyle = "TableStyleMedium2"
+  foreach ($record in $records) {
+    $row = $table.ListRows.Add()
+    $row.Range.Cells.Item(1, 1).Value2 = [string]$record.date
+    $row.Range.Cells.Item(1, 2).Value2 = [string]$record.task
+    $row.Range.Cells.Item(1, 3).Value2 = [string]$record.detail
+    $row.Range.Cells.Item(1, 4).Value2 = [string]$record.startTime
+    $row.Range.Cells.Item(1, 5).Value2 = [string]$record.endTime
+    $row.Range.Cells.Item(1, 6).Value2 = [double]$record.durationMin
+    $row.Range.Cells.Item(1, 7).Value2 = if ([bool]$record.isBreak) { "休憩" } else { "" }
+  }
+  $ws.Columns.AutoFit() | Out-Null
+  $wb.SaveAs($savePath, 51)
+  Write-Output $savePath
+} finally {
+  if ($null -ne $wb) { $wb.Close($false) | Out-Null }
+  $excel.Quit() | Out-Null
+  if ($null -ne $table) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($table) | Out-Null }
+  if ($null -ne $ws) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ws) | Out-Null }
+  if ($null -ne $wb) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($wb) | Out-Null }
+  [System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
+}
+"#;
+
+    let script_path = std::env::temp_dir().join(format!(
+        "minimal_timer_export_{}_{}.ps1",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_millis()
+    ));
+    let mut script_bytes = vec![0xEF, 0xBB, 0xBF];
+    script_bytes.extend_from_slice(script.as_bytes());
+    fs::write(&script_path, script_bytes).map_err(|e| e.to_string())?;
+    let script_path_arg = script_path.to_string_lossy().to_string();
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let output = Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Sta",
+            "-File",
+            script_path_arg.as_str(),
+            json_path,
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| e.to_string());
+    let _ = fs::remove_file(&script_path);
+    let output = output?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Ok(stdout)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Err(if stderr.is_empty() { stdout } else { stderr })
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn run_excel_export_script(_json_path: &str) -> Result<String, String> {
+    Err("Excel出力はWindows版のみ対応しています".into())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -522,6 +690,7 @@ pub fn run() {
             get_window_position,
             set_window_position,
             append_excel_records,
+            export_excel_records,
             set_cursor_passthrough,
         ])
         .on_window_event(|window, event| {
