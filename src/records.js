@@ -93,6 +93,13 @@ function fmtTime(ms) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function taskColor(name, isBreak) {
+  if (isBreak) return 'rgba(74, 222, 128, 0.55)';
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360}, 60%, 58%)`;
+}
+
 function taskFontSize(text) {
   const len = text.length;
   if (len <= 22) return '12px';
