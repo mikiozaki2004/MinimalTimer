@@ -50,7 +50,11 @@
     <!-- 日別詳細 -->
     <div class="day-detail">
       <div class="day-detail-header" id="day-detail-header"></div>
-      <div class="task-bars" id="task-bars"></div>
+      <div class="timeline">
+        <div class="tl-bar" id="timeline-bar"></div>
+        <div class="tl-ticks" id="timeline-ticks"></div>
+        <div class="tl-totals" id="timeline-totals"></div>
+      </div>
       <div class="detail-sep hidden" id="detail-sep"></div>
       <div class="session-list-wrap">
         <div class="session-list" id="session-list"></div>
@@ -67,6 +71,35 @@
         全記録をExcel出力
       </button>
       <span class="export-status" id="export-status"></span>
+    </div>
+
+    <!-- タイムライン記入モーダル -->
+    <div class="timeline-modal hidden" id="timeline-modal">
+      <div class="tm-header" data-tauri-drag-region>
+        <span class="tm-time" id="tm-time"></span>
+        <span class="tm-duration" id="tm-duration"></span>
+      </div>
+      <div class="tm-body">
+        <div class="tm-section">
+          <span class="tm-label">カテゴリ</span>
+          <div class="tm-categories" id="tm-categories"></div>
+        </div>
+        <div class="tm-section">
+          <span class="tm-label">メモ</span>
+          <input type="text" class="tm-input" id="tm-memo" placeholder="例: 朝食 / 散歩 / 英語学習">
+        </div>
+        <div class="tm-section tm-time-row">
+          <span class="tm-label">時間</span>
+          <input type="time" id="tm-start" class="tm-input tm-time-input">
+          <span class="tm-tilde">〜</span>
+          <input type="time" id="tm-end" class="tm-input tm-time-input">
+          <span class="tm-duration-edit" id="tm-duration-edit"></span>
+        </div>
+      </div>
+      <div class="tm-actions">
+        <button class="tm-cancel-btn" id="tm-cancel-btn">キャンセル</button>
+        <button class="tm-submit-btn" id="tm-submit-btn">保存</button>
+      </div>
     </div>
 
     <!-- 手動追加フォーム -->

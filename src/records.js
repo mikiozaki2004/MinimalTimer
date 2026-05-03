@@ -6,6 +6,47 @@ let viewYear = new Date().getFullYear();
 let viewMonth = new Date().getMonth(); // 0-based
 const MAX_HEAT_SECONDS = 12 * 60 * 60;
 
+// ── Categories ──────────────────────────────────────────────────────────────
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS  = 24 * HOUR_MS;
+const MIN_GAP_MS = 5 * 60 * 1000; // ギャップとして表示する下限 (5分)
+const SLEEP_DEFAULT_MS = 6 * HOUR_MS; // この長さ以上のギャップは「睡眠」を初期選択
+
+const CATEGORIES = [
+  { id: 'sleep',    name: '睡眠',   emoji: '😴', color: '#6366F1' },
+  { id: 'meal',     name: '食事',   emoji: '🍽',  color: '#F59E0B' },
+  { id: 'work',     name: '作業',   emoji: '💼', color: '#3B82F6' },
+  { id: 'move',     name: '移動',   emoji: '🚶', color: '#10B981' },
+  { id: 'exercise', name: '運動',   emoji: '🏃', color: '#EF4444' },
+  { id: 'leisure',  name: '余暇',   emoji: '🎮', color: '#A855F7' },
+  { id: 'study',    name: '学習',   emoji: '📚', color: '#0EA5E9' },
+  { id: 'other',    name: 'その他', emoji: '📌', color: '#94A3B8' },
+];
+const BREAK_CATEGORY = { id: 'break', name: '休憩', emoji: '☕', color: '#4ADE80' };
+
+function categoryById(id) {
+  if (id === 'break') return BREAK_CATEGORY;
+  return CATEGORIES.find(c => c.id === id) || CATEGORIES.find(c => c.id === 'work');
+}
+
+function logCategory(log) {
+  if (log.category) return log.category;
+  if (log.isBreak)  return 'break';
+  return 'work';
+}
+
+// タイムラインのギャップから追加された記録は作業時間集計の対象外
+// (旧データ互換: source='manual' + category も該当)
+function isTimelineEntry(log) {
+  if (log.source === 'timeline') return true;
+  if (log.source === 'manual' && log.category) return true;
+  return false;
+}
+
+function countsAsWork(log) {
+  return !log.isBreak && !isTimelineEntry(log);
+}
+
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -17,7 +58,9 @@ const calendarGrid   = document.getElementById('calendar-grid');
 const headerMonth    = document.getElementById('header-month');
 const headerTotal    = document.getElementById('header-total');
 const dayDetailHeader = document.getElementById('day-detail-header');
-const taskBarsEl     = document.getElementById('task-bars');
+const timelineBar    = document.getElementById('timeline-bar');
+const timelineTicks  = document.getElementById('timeline-ticks');
+const timelineTotals = document.getElementById('timeline-totals');
 const detailSep      = document.getElementById('detail-sep');
 const sessionList    = document.getElementById('session-list');
 const addInlineBtn   = document.getElementById('add-inline-btn');
@@ -74,7 +117,7 @@ function getAddFormTaskOptions() {
     .map((task) => typeof task === 'string' ? task : String(task?.name ?? '').trim())
     .filter((task) => task && task !== '休憩');
   const loggedTasks = logs
-    .filter((log) => !log.isBreak && log.task && log.task !== '休憩')
+    .filter((log) => countsAsWork(log) && log.task && log.task !== '休憩')
     .map((log) => log.task);
   return [...new Set([...storedTasks, ...loggedTasks])];
 }
@@ -108,7 +151,7 @@ function getMonthData(year, month) {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     if (!result.has(key)) result.set(key, { sec: 0, sessions: [] });
     const entry = result.get(key);
-    if (!l.isBreak) entry.sec += l.duration;
+    if (countsAsWork(l)) entry.sec += l.duration;
     entry.sessions.push(l);
   });
 
@@ -214,29 +257,69 @@ function selectDate(dateStr) {
   renderDayDetail(dateStr);
 }
 
+// ── Day Window / Segments ───────────────────────────────────────────────────
+function getDayWindow(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const start = new Date(y, m - 1, d, 0, 0, 0).getTime();
+  return { start, end: start + DAY_MS };
+}
+
+function getSessionRange(log) {
+  const endMs = log.endedAt ?? log.timestamp;
+  const startMs = log.startedAt ?? (endMs - log.duration * 1000);
+  return { startMs, endMs };
+}
+
+function getDaySegments(dateStr) {
+  const { start: ws, end: we } = getDayWindow(dateStr);
+  const segments = [];
+  logs.forEach(l => {
+    const { startMs, endMs } = getSessionRange(l);
+    const s = Math.max(startMs, ws);
+    const e = Math.min(endMs, we);
+    if (e > s) {
+      segments.push({
+        log: l,
+        startMs: s,
+        endMs: e,
+        category: logCategory(l),
+      });
+    }
+  });
+  segments.sort((a, b) => a.startMs - b.startMs);
+  return { segments, windowStart: ws, windowEnd: we };
+}
+
+function findGaps(segments, windowStart, windowEnd) {
+  const gaps = [];
+  let cursor = windowStart;
+  segments.forEach(seg => {
+    if (seg.startMs > cursor + MIN_GAP_MS) {
+      gaps.push({ startMs: cursor, endMs: seg.startMs });
+    }
+    cursor = Math.max(cursor, seg.endMs);
+  });
+  if (windowEnd > cursor + MIN_GAP_MS) {
+    gaps.push({ startMs: cursor, endMs: windowEnd });
+  }
+  return gaps;
+}
+
 // ── Render Day Detail ────────────────────────────────────────────────────────
 function renderDayDetail(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const dow = (new Date(y, m - 1, d).getDay() + 6) % 7; // 0=月
   const dayLabel = `${m}月${d}日（${DAY_NAMES[dow]}）`;
 
-  const monthMap = getMonthData(viewYear, viewMonth);
+  const { segments, windowStart, windowEnd } = getDaySegments(dateStr);
 
-  // 選択日が今表示中の月と異なる場合も考慮
-  let data = monthMap.get(dateStr);
-  if (!data) {
-    // 別月の日付の場合は直接ログから取得
-    const startMs = new Date(y, m - 1, d).getTime();
-    const endMs   = new Date(y, m - 1, d + 1).getTime();
-    const dayLogs = logs.filter(l => {
-      const t = l.endedAt ?? l.timestamp;
-      return t >= startMs && t < endMs;
-    });
-    const workSec = dayLogs.filter(l => !l.isBreak).reduce((s, l) => s + l.duration, 0);
-    data = { sec: workSec, sessions: dayLogs };
-  }
+  // 表示用のセッションリスト (タイムライン窓と重なるログ全体)
+  const sessions = [...new Set(segments.map(s => s.log))];
 
-  const { sec: workSec, sessions } = data;
+  // ヘッダー総計: タイマー記録 + 「作業を追加」の手動入力のみ (タイムライン入力は除外)
+  const workSec = segments
+    .filter(s => countsAsWork(s.log))
+    .reduce((sum, s) => sum + (s.endMs - s.startMs) / 1000, 0);
 
   // ── ヘッダー ──
   dayDetailHeader.innerHTML = '';
@@ -248,47 +331,17 @@ function renderDayDetail(dateStr) {
   if (workSec > 0) {
     const totalSpan = document.createElement('span');
     totalSpan.className = 'day-detail-total';
-    totalSpan.textContent = fmtDuration(workSec);
+    totalSpan.textContent = fmtDuration(Math.round(workSec));
     dayDetailHeader.appendChild(totalSpan);
   }
 
-  // ── タスクバー集計 ──
-  taskBarsEl.innerHTML = '';
-  const taskTotals = {};
-  sessions.filter(l => !l.isBreak).forEach(l => {
-    const name = l.detail ? `${l.task} / ${l.detail}` : l.task;
-    taskTotals[name] = (taskTotals[name] || 0) + l.duration;
-  });
-  const taskEntries = Object.entries(taskTotals)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
-
-  const fills = [];
-  taskEntries.forEach(([name, sec], i) => {
-    const maxSec = taskEntries[0][1];
-    const pct = (sec / maxSec) * 100;
-
-    const row = document.createElement('div');
-    row.className = 'task-bar-row';
-    row.style.animationDelay = `${i * 55}ms`;
-    row.innerHTML = `
-      <span class="task-bar-name" title="${name}">${name}</span>
-      <div class="task-bar-track"><div class="task-bar-fill" data-pct="${pct.toFixed(1)}"></div></div>
-      <span class="task-bar-time">${fmtDuration(sec)}</span>
-    `;
-    taskBarsEl.appendChild(row);
-    fills.push(row.querySelector('.task-bar-fill'));
-  });
-
-  // バーアニメーション
-  if (fills.length > 0) {
-    setTimeout(() => {
-      fills.forEach(el => { el.style.width = el.dataset.pct + '%'; });
-    }, taskEntries.length * 55 + 100);
-  }
+  // ── タイムライン ──
+  renderTimelineBar(dateStr, segments, windowStart);
+  renderTimelineTicks();
+  renderTimelineTotals(segments);
 
   // ── セパレーター ──
-  if (workSec > 0 && sessions.length > 0) {
+  if (sessions.length > 0) {
     detailSep.classList.remove('hidden');
   } else {
     detailSep.classList.add('hidden');
@@ -304,22 +357,22 @@ function renderDayDetail(dateStr) {
     sessionList.appendChild(empty);
   } else {
     const sorted = [...sessions].sort((a, b) => {
-      const ta = a.startedAt ?? ((a.endedAt ?? a.timestamp) - a.duration * 1000);
-      const tb = b.startedAt ?? ((b.endedAt ?? b.timestamp) - b.duration * 1000);
+      const ta = getSessionRange(a).startMs;
+      const tb = getSessionRange(b).startMs;
       return ta - tb;
     });
 
     sorted.forEach((l, i) => {
-      const endMs   = l.endedAt ?? l.timestamp;
-      const startMs = l.startedAt ?? (endMs - l.duration * 1000);
+      const { startMs, endMs } = getSessionRange(l);
       const taskLabel = l.detail ? `${l.task} / ${l.detail}` : l.task;
+      const cat = categoryById(logCategory(l));
 
       const row = document.createElement('div');
       row.className = 'session-row' + (l.isBreak ? ' break' : '');
       row.style.animationDelay = `${i * 38}ms`;
       row.innerHTML = `
         <span class="session-range">${fmtTime(startMs)} → ${fmtTime(endMs)}</span>
-        <span class="session-task" style="font-size:${taskFontSize(taskLabel)}">${l.isBreak ? '☕ ' : ''}${taskLabel}</span>
+        <span class="session-task" style="font-size:${taskFontSize(taskLabel)}">${cat.emoji} ${taskLabel}</span>
         <span class="session-dur">${fmtDuration(l.duration)}</span>
         <button class="session-del" title="削除">×</button>
       `;
@@ -330,6 +383,70 @@ function renderDayDetail(dateStr) {
       sessionList.appendChild(row);
     });
   }
+}
+
+// ── Render Timeline ──────────────────────────────────────────────────────────
+function renderTimelineBar(dateStr, segments, windowStart) {
+  timelineBar.innerHTML = '';
+
+  // ギャップ (背景に表示)
+  const gaps = findGaps(segments, windowStart, windowStart + DAY_MS);
+  gaps.forEach((g, i) => {
+    const left  = ((g.startMs - windowStart) / DAY_MS) * 100;
+    const width = ((g.endMs - g.startMs) / DAY_MS) * 100;
+    const durMs = g.endMs - g.startMs;
+    const btn = document.createElement('button');
+    btn.className = 'tl-gap';
+    btn.style.left  = `${left}%`;
+    btn.style.width = `${width}%`;
+    btn.title = `${fmtTime(g.startMs)} – ${fmtTime(g.endMs)} (${fmtDuration(durMs / 1000)})`;
+    if (width > 4) btn.textContent = '?';
+    btn.addEventListener('click', () => openTimelineModal(dateStr, g));
+    timelineBar.appendChild(btn);
+  });
+
+  // セグメント (前景)
+  segments.forEach(s => {
+    const cat   = categoryById(s.category);
+    const left  = ((s.startMs - windowStart) / DAY_MS) * 100;
+    const width = ((s.endMs - s.startMs) / DAY_MS) * 100;
+    const el = document.createElement('div');
+    el.className = 'tl-seg';
+    el.style.left  = `${left}%`;
+    el.style.width = `${width}%`;
+    el.style.setProperty('--seg-color', cat.color);
+    const taskLabel = s.log.task ? ` ${s.log.task}` : '';
+    el.title = `${cat.emoji} ${cat.name}${taskLabel}\n${fmtTime(s.startMs)} – ${fmtTime(s.endMs)} (${fmtDuration((s.endMs - s.startMs) / 1000)})`;
+    timelineBar.appendChild(el);
+  });
+}
+
+function renderTimelineTicks() {
+  timelineTicks.innerHTML = '';
+  for (let h = 0; h <= 24; h += 3) {
+    const tick = document.createElement('span');
+    tick.className = 'tl-tick';
+    tick.style.left = `${(h / 24) * 100}%`;
+    tick.textContent = h === 24 ? '24' : String(h);
+    timelineTicks.appendChild(tick);
+  }
+}
+
+function renderTimelineTotals(segments) {
+  timelineTotals.innerHTML = '';
+  const totals = {};
+  segments.forEach(s => {
+    totals[s.category] = (totals[s.category] || 0) + (s.endMs - s.startMs);
+  });
+  Object.entries(totals)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([catId, ms]) => {
+      const cat = categoryById(catId);
+      const item = document.createElement('span');
+      item.className = 'tl-stat';
+      item.innerHTML = `<span class="tl-stat-dot" style="--stat-color:${cat.color}"></span>${cat.name} ${fmtDuration(Math.round(ms / 1000))}`;
+      timelineTotals.appendChild(item);
+    });
 }
 
 // ── Delete Session ────────────────────────────────────────────────────────────
@@ -461,6 +578,136 @@ document.getElementById('add-end').addEventListener('input', updateDurationPrevi
 addInlineBtn.addEventListener('click', openAddForm);
 document.getElementById('add-cancel-btn').addEventListener('click', closeAddForm);
 document.getElementById('add-submit-btn').addEventListener('click', submitAddForm);
+
+// ── Timeline Modal ──────────────────────────────────────────────────────────
+let pendingGap = null;
+let pendingDate = null;
+let selectedCategoryId = null;
+
+const tmModal       = document.getElementById('timeline-modal');
+const tmTimeEl      = document.getElementById('tm-time');
+const tmDurationEl  = document.getElementById('tm-duration');
+const tmCategoriesEl = document.getElementById('tm-categories');
+const tmMemoEl      = document.getElementById('tm-memo');
+const tmStartEl     = document.getElementById('tm-start');
+const tmEndEl       = document.getElementById('tm-end');
+const tmDurEditEl   = document.getElementById('tm-duration-edit');
+const tmSubmitEl    = document.getElementById('tm-submit-btn');
+
+function openTimelineModal(dateStr, gap) {
+  pendingGap = gap;
+  pendingDate = dateStr;
+  selectedCategoryId = null;
+
+  // ヘッダー
+  tmTimeEl.textContent     = `${fmtTime(gap.startMs)} – ${fmtTime(gap.endMs)}`;
+  tmDurationEl.textContent = `(${fmtDuration(Math.round((gap.endMs - gap.startMs) / 1000))})`;
+
+  // カテゴリボタン
+  tmCategoriesEl.innerHTML = '';
+  CATEGORIES.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'tm-cat-btn';
+    btn.dataset.id = c.id;
+    btn.style.setProperty('--cat-color', c.color);
+    btn.innerHTML = `<span class="tm-cat-emoji">${c.emoji}</span><span class="tm-cat-name">${c.name}</span>`;
+    btn.addEventListener('click', () => selectCategory(c.id));
+    tmCategoriesEl.appendChild(btn);
+  });
+
+  // 6時間以上のギャップは「睡眠」を初期選択
+  const gapMs = gap.endMs - gap.startMs;
+  if (gapMs >= SLEEP_DEFAULT_MS) {
+    selectCategory('sleep');
+  } else {
+    updateSubmitState();
+  }
+
+  // メモ・時間
+  tmMemoEl.value = '';
+  const pad = n => String(n).padStart(2, '0');
+  const sd = new Date(gap.startMs);
+  const ed = new Date(gap.endMs);
+  tmStartEl.value = `${pad(sd.getHours())}:${pad(sd.getMinutes())}`;
+  tmEndEl.value   = `${pad(ed.getHours())}:${pad(ed.getMinutes())}`;
+  updateModalDuration();
+
+  tmModal.classList.remove('hidden');
+}
+
+function selectCategory(id) {
+  selectedCategoryId = id;
+  document.querySelectorAll('.tm-cat-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.id === id);
+  });
+  updateSubmitState();
+}
+
+function updateSubmitState() {
+  tmSubmitEl.disabled = !selectedCategoryId;
+}
+
+function parseModalRange() {
+  if (!pendingGap || !tmStartEl.value || !tmEndEl.value) return null;
+  const [sh, sm] = tmStartEl.value.split(':').map(Number);
+  const [eh, em] = tmEndEl.value.split(':').map(Number);
+  // ギャップが日跨ぎだった場合は元の日付コンテキストを尊重
+  const sd = new Date(pendingGap.startMs);
+  const ed = new Date(pendingGap.endMs);
+  sd.setHours(sh, sm, 0, 0);
+  ed.setHours(eh, em, 0, 0);
+  // 終了 < 開始の場合は同日扱いを翌日に補正
+  if (ed.getTime() <= sd.getTime()) {
+    ed.setDate(ed.getDate() + 1);
+  }
+  return { startMs: sd.getTime(), endMs: ed.getTime() };
+}
+
+function updateModalDuration() {
+  const r = parseModalRange();
+  if (!r) { tmDurEditEl.textContent = ''; return; }
+  const ms = r.endMs - r.startMs;
+  tmDurEditEl.textContent = ms > 0 ? fmtDuration(Math.round(ms / 1000)) : '—';
+}
+
+function closeTimelineModal() {
+  tmModal.classList.add('hidden');
+  pendingGap = null;
+  pendingDate = null;
+  selectedCategoryId = null;
+}
+
+async function submitTimelineModal() {
+  if (!pendingGap || !selectedCategoryId) return;
+  const range = parseModalRange();
+  if (!range || range.endMs <= range.startMs) return;
+
+  const cat = categoryById(selectedCategoryId);
+  const memo = tmMemoEl.value.trim();
+  const taskName = memo || cat.name;
+  const durationSec = Math.round((range.endMs - range.startMs) / 1000);
+
+  logs.push({
+    id: Math.random().toString(36).slice(2),
+    task: taskName,
+    category: cat.id,
+    duration: durationSec,
+    timestamp: range.endMs,
+    endedAt: range.endMs,
+    startedAt: range.startMs,
+    isManual: true,
+    source: 'timeline',
+  });
+  await storageSet('mt_logs', logs);
+
+  closeTimelineModal();
+  renderAll();
+}
+
+tmStartEl.addEventListener('input', updateModalDuration);
+tmEndEl.addEventListener('input', updateModalDuration);
+document.getElementById('tm-cancel-btn').addEventListener('click', closeTimelineModal);
+tmSubmitEl.addEventListener('click', submitTimelineModal);
 
 // ── Excel Export ──────────────────────────────────────────────────────────────
 function sessionToExportRecord(session) {
