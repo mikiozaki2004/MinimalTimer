@@ -389,11 +389,17 @@ function startPomo(sets) {
 btnPlay.addEventListener('click', () => {
   dismissCompletion();
   exitBreak();
-  if (st.running) logSession();
+  if (st.running) {
+    logSession();
+    st.elapsed = 0;
+    lastSecond = -1;
+  }
   st.running = !st.running;
   if (st.running && st.sessionStart === null) st.sessionStart = Date.now();
   setPlayIcon(st.running);
   if (st.running) startTick();
+  refreshText();
+  draw();
 });
 
 btnPause.addEventListener('click', () => {
@@ -782,11 +788,17 @@ document.addEventListener('keydown', (e) => {
   if (timerInputEl.style.display === 'block') return;
   e.preventDefault();
   if (completionActive) { dismissCompletion(); return; }
-  if (st.running) logSession();
+  if (st.running) {
+    logSession();
+    st.elapsed = 0;
+    lastSecond = -1;
+  }
   st.running = !st.running;
   if (st.running && st.sessionStart === null) st.sessionStart = Date.now();
   setPlayIcon(st.running);
   if (st.running) startTick();
+  refreshText();
+  draw();
 });
 
 // ── Task state ─────────────────────────────────────────────────────────────
