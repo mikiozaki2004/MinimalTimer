@@ -138,21 +138,44 @@ function animateCount(el, targetSec) {
 }
 
 // ── Data ─────────────────────────────────────────────────────────────────────
+function dateKeyFromMs(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function getMonthData(year, month) {
   const startMs = new Date(year, month, 1).getTime();
   const endMs   = new Date(year, month + 1, 1).getTime();
   const result  = new Map();
 
-  logs.filter(l => {
-    const t = l.endedAt ?? l.timestamp;
-    return t >= startMs && t < endMs;
-  }).forEach(l => {
-    const d = new Date(l.endedAt ?? l.timestamp);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const ensureEntry = (key) => {
     if (!result.has(key)) result.set(key, { sec: 0, sessions: [] });
-    const entry = result.get(key);
-    if (countsAsWork(l)) entry.sec += l.duration;
-    entry.sessions.push(l);
+    return result.get(key);
+  };
+
+  logs.forEach(l => {
+    const { startMs: sMs, endMs: eMs } = getSessionRange(l);
+    if (eMs <= startMs || sMs >= endMs) return;
+
+    // 終了日にセッション本体を紐付ける（一覧表示用）
+    const endKey = dateKeyFromMs(eMs);
+    ensureEntry(endKey).sessions.push(l);
+
+    if (!countsAsWork(l)) return;
+
+    // 日境界でクリップしながら各日に秒数を加算
+    let cursor = sMs;
+    while (cursor < eMs) {
+      const d = new Date(cursor);
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const dayEnd = dayStart + DAY_MS;
+      const segEnd = Math.min(eMs, dayEnd);
+      if (cursor >= startMs && cursor < endMs) {
+        const key = dateKeyFromMs(cursor);
+        ensureEntry(key).sec += (segEnd - cursor) / 1000;
+      }
+      cursor = segEnd;
+    }
   });
 
   return result;
