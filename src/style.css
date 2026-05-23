@@ -920,6 +920,84 @@ body.sunset .circle.break-mode {
 .sheets-bulk-btn:hover { opacity: 1; background: rgba(255,255,255,0.06); }
 .sheets-bulk-btn:disabled { opacity: 0.3; cursor: default; }
 
+/* ── Timelapse settings (extends sheets-panel) ───────────────────── */
+.tl-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 10px;
+  color: var(--fg);
+  opacity: 0.85;
+  margin: 4px 0 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tl-toggle input { cursor: pointer; }
+
+.tl-row {
+  display: flex;
+  gap: 8px;
+}
+
+.tl-col {
+  flex: 1;
+}
+
+.tl-num {
+  text-align: right;
+}
+
+.tl-select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: var(--fg);
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 10px;
+  padding: 5px 6px;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.4s ease;
+}
+
+.tl-select:focus {
+  border-color: var(--ring);
+}
+
+/* Recording indicator: top-left corner of the circle, REC style */
+.tl-indicator {
+  display: none;
+  position: absolute;
+  top: 30px;
+  left: 50px;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 9px;
+  font-weight: 500;
+  color: #F87171;
+  letter-spacing: 1px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.tl-indicator.active { display: flex; }
+
+.tl-indicator .tl-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #F87171;
+  animation: tlPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes tlPulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.1); }
+}
+
 /* ── Completion notification ─────────────────────────────────────── */
 html.completion,
 html.completion body {

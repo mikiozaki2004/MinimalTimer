@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     process::Command,
     sync::{atomic::{AtomicBool, Ordering}, Mutex},
     time::{SystemTime, UNIX_EPOCH},
@@ -653,6 +653,76 @@ fn run_excel_export_script(_json_path: &str) -> Result<String, String> {
     Err("Excel出力はWindows版のみ対応しています".into())
 }
 
+// ── Timelapse ──────────────────────────────────────────────────────
+
+fn timelapses_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let mut dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("AppData ディレクトリを取得できません: {}", e))?;
+    dir.push("timelapses");
+    fs::create_dir_all(&dir).map_err(|e| format!("フォルダ作成に失敗: {}", e))?;
+    Ok(dir)
+}
+
+fn sanitize_file_name(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .filter(|c| !matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+        .collect();
+    let trimmed = cleaned.trim();
+    let fallback = format!(
+        "timelapse_{}.mp4",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    );
+    if trimmed.is_empty() {
+        fallback
+    } else {
+        trimmed.to_string()
+    }
+}
+
+#[tauri::command]
+async fn save_timelapse_mp4(
+    app: tauri::AppHandle,
+    file_name: String,
+    data: Vec<u8>,
+) -> Result<String, String> {
+    if data.is_empty() {
+        return Err("保存するデータが空です".into());
+    }
+    let dir = timelapses_dir(&app)?;
+    let safe = sanitize_file_name(&file_name);
+    let path = dir.join(safe);
+    fs::write(&path, &data).map_err(|e| format!("保存に失敗: {}", e))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn open_timelapses_folder(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = timelapses_dir(&app)?;
+    open_folder_in_explorer(&dir)
+}
+
+#[cfg(target_os = "windows")]
+fn open_folder_in_explorer(dir: &Path) -> Result<(), String> {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    Command::new("explorer.exe")
+        .arg(dir.as_os_str())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| format!("explorer.exe を起動できません: {}", e))?;
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn open_folder_in_explorer(_dir: &Path) -> Result<(), String> {
+    Err("フォルダを開く機能は Windows のみ対応しています".into())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -692,6 +762,8 @@ pub fn run() {
             append_excel_records,
             export_excel_records,
             set_cursor_passthrough,
+            save_timelapse_mp4,
+            open_timelapses_folder,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

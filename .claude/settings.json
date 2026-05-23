@@ -2,7 +2,22 @@
   "permissions": {
     "allow": [
       "Bash(kill %1)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "Bash(node --check src/records.js)",
+      "Bash(node --input-type=module --check)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git merge *)",
+      "Bash(mkdir c:\\\\dev\\\\MinimalTimer\\\\src\\\\vendor)",
+      "Bash(copy c:\\\\dev\\\\MinimalTimer\\\\node_modules\\\\mp4-muxer\\\\build\\\\mp4-muxer.mjs c:\\\\dev\\\\MinimalTimer\\\\src\\\\vendor\\\\mp4-muxer.mjs)",
+      "Bash(cp c:/dev/MinimalTimer/node_modules/mp4-muxer/build/mp4-muxer.mjs c:/dev/MinimalTimer/src/vendor/mp4-muxer.mjs && echo OK)",
+      "Bash(jobs)",
+      "Bash(tasklist)",
+      "Bash(taskkill /F /PID 35820)",
+      "Bash(taskkill //F //PID 35820)"
+    ],
+    "additionalDirectories": [
+      "c:\\dev\\MinimalTimer\\node_modules\\mp4-muxer\\build"
     ]
   }
 }

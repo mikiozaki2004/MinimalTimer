@@ -1,5 +1,6 @@
 import { initStorage, storageGet, storageSet } from './store.js';
 import { initWater, resetWater, ensureLoop as waterEnsureLoop } from './water.js';
+import * as timelapse from './timelapse.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const CIRCUMFERENCE = 2 * Math.PI * 126;
@@ -8,7 +9,6 @@ const THEMES = ['', 'light', 'sunset'];
 // ── State ──────────────────────────────────────────────────────────────────
 const st = {
   mode: 'countdown',
-  running: false,
   elapsed: 0,
   total: 25 * 60,
   themeIdx: 0,
@@ -16,6 +16,30 @@ const st = {
   sessionStart: null,
   breakMode: false,
 };
+
+// st.running は他のコードから単純な代入で更新されるが、
+// タイムラプス記録の開始/停止フックのため setter で監視する
+let _running = false;
+Object.defineProperty(st, 'running', {
+  get() { return _running; },
+  set(v) {
+    const next = Boolean(v);
+    if (next === _running) return;
+    _running = next;
+    onRunningChanged(next);
+  },
+});
+
+function onRunningChanged(running) {
+  if (running) {
+    const label = currentTask
+      ? (currentDetail ? `${currentTask}_${currentDetail}` : currentTask)
+      : (st.breakMode ? '休憩' : 'session');
+    timelapse.start({ task: label }).catch((e) => console.warn('[timelapse] start failed', e));
+  } else {
+    timelapse.stop({ save: true }).catch((e) => console.warn('[timelapse] stop failed', e));
+  }
+}
 
 // ── Window size ────────────────────────────────────────────────────────────
 let currentWindowSize = 280;
@@ -708,6 +732,106 @@ document.addEventListener('click', (e) => {
   if (!ctxMenu.contains(e.target) && e.target !== btnRecords) closeCtxMenu();
 });
 
+// ── Timelapse settings panel ───────────────────────────────────────
+const ctxTimelapseSetup = document.getElementById('ctx-timelapse-setup');
+const tlPanel        = document.getElementById('timelapse-panel');
+const tlEnabledEl    = document.getElementById('tl-enabled');
+const tlCameraEl     = document.getElementById('tl-camera');
+const tlIntervalEl   = document.getElementById('tl-interval');
+const tlFpsEl        = document.getElementById('tl-fps');
+const tlResolutionEl = document.getElementById('tl-resolution');
+const tlStatusEl     = document.getElementById('tl-status');
+const tlCancelBtn    = document.getElementById('tl-cancel-btn');
+const tlSaveBtn      = document.getElementById('tl-save-btn');
+const tlOpenFolderBtn= document.getElementById('tl-open-folder-btn');
+const tlIndicator    = document.getElementById('tl-indicator');
+
+function tlPanelOpen() { return tlPanel.classList.contains('open'); }
+
+async function openTimelapsePanel() {
+  const settings = timelapse.getSettings();
+  tlEnabledEl.checked    = !!settings.enabled;
+  tlIntervalEl.value     = settings.intervalSec;
+  tlFpsEl.value          = settings.fps;
+  tlResolutionEl.value   = settings.resolution;
+  tlStatusEl.textContent = '';
+  tlCameraEl.innerHTML   = `<option value="">読み込み中...</option>`;
+  tlPanel.classList.add('open');
+
+  try {
+    const cams = await timelapse.listCameras();
+    if (cams.length === 0) {
+      tlCameraEl.innerHTML = `<option value="">カメラが見つかりません</option>`;
+    } else {
+      tlCameraEl.innerHTML = `<option value="">自動選択</option>` +
+        cams.map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join('');
+      tlCameraEl.value = settings.cameraId || '';
+    }
+  } catch (e) {
+    tlCameraEl.innerHTML = `<option value="">アクセス不可</option>`;
+    tlStatusEl.textContent = 'カメラアクセスが許可されていません';
+  }
+}
+
+function closeTimelapsePanel() {
+  tlPanel.classList.add('closing');
+  tlPanel.addEventListener('animationend', () => {
+    tlPanel.classList.remove('open', 'closing');
+  }, { once: true });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+ctxTimelapseSetup.addEventListener('click', () => {
+  closeCtxMenu();
+  if (sheetsPanel.classList.contains('open')) closeSheetsPanel();
+  openTimelapsePanel();
+});
+
+tlCancelBtn.addEventListener('click', () => closeTimelapsePanel());
+
+tlSaveBtn.addEventListener('click', () => {
+  timelapse.saveSettings({
+    enabled:     tlEnabledEl.checked,
+    cameraId:    tlCameraEl.value,
+    intervalSec: tlIntervalEl.value,
+    fps:         tlFpsEl.value,
+    resolution:  tlResolutionEl.value,
+  });
+  tlStatusEl.textContent = '保存しました';
+  setTimeout(() => closeTimelapsePanel(), 600);
+});
+
+tlOpenFolderBtn.addEventListener('click', async () => {
+  try { await timelapse.openFolder(); } catch (e) {
+    tlStatusEl.textContent = 'フォルダを開けませんでした';
+  }
+});
+
+tlPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+[tlIntervalEl, tlFpsEl].forEach((el) => {
+  el.addEventListener('mousedown', (e) => e.stopPropagation());
+  el.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); tlSaveBtn.click(); }
+    if (e.key === 'Escape') closeTimelapsePanel();
+  });
+});
+tlCameraEl.addEventListener('mousedown', (e) => e.stopPropagation());
+tlResolutionEl.addEventListener('mousedown', (e) => e.stopPropagation());
+
+timelapse.onStatusChange((s) => {
+  if (s.recording) {
+    tlIndicator.classList.add('active');
+  } else {
+    tlIndicator.classList.remove('active');
+  }
+});
+
 // ── Timer click → edit mode ────────────────────────────────────────────────
 function parseTimeInput(s) {
   s = s.trim();
@@ -933,6 +1057,8 @@ circle.addEventListener('wheel', (e) => {
 // ── Init ───────────────────────────────────────────────────────────────────
 (async () => {
   await initStorage();
+
+  timelapse.loadSettings();
 
   applyTaskState({
     task: storageGet('mt_current_task', ''),

@@ -38,6 +38,9 @@
     <!-- Sync status (positioned at bottom of circle, outside center-group) -->
     <div class="sync-status" id="sync-status" aria-live="polite"></div>
 
+    <!-- Timelapse recording indicator -->
+    <div class="tl-indicator" id="tl-indicator" aria-hidden="true"><span class="tl-dot"></span><span class="tl-text">REC</span></div>
+
     <!-- Primary controls (center bottom, hover only) -->
     <div class="controls ctrl-fade">
       <button class="btn" id="btn-play" title="開始 / 停止（記録）">
@@ -99,6 +102,7 @@
     <!-- Records context menu -->
     <div class="ctx-menu" id="records-ctx-menu">
       <button class="ctx-menu-item" id="ctx-sheets-setup">Excel / Sheets 連携</button>
+      <button class="ctx-menu-item" id="ctx-timelapse-setup">タイムラプス設定</button>
       <button class="ctx-menu-item" id="ctx-open-devtools">開発者ツールと共に開く</button>
     </div>
 
@@ -117,6 +121,45 @@
       </div>
       <button class="sheets-bulk-btn" id="sheets-bulk-btn">URLへ過去の記録を送信</button>
       <button class="sheets-bulk-btn" id="excel-bulk-btn">Excelへ過去の記録を追記</button>
+    </div>
+
+    <!-- Timelapse setup panel -->
+    <div class="sheets-panel" id="timelapse-panel">
+      <div class="sheets-panel-title">タイムラプス</div>
+      <div class="sheets-panel-desc">タイマー開始/停止に合わせて Web カメラを記録します</div>
+
+      <label class="tl-toggle">
+        <input type="checkbox" id="tl-enabled">
+        <span>タイマー連動を有効にする</span>
+      </label>
+
+      <div class="sheets-panel-label">カメラ</div>
+      <select class="tl-select" id="tl-camera"></select>
+
+      <div class="tl-row">
+        <div class="tl-col">
+          <div class="sheets-panel-label">撮影間隔（秒）</div>
+          <input class="sheets-url-input tl-num" id="tl-interval" type="number" min="1" max="600" step="1">
+        </div>
+        <div class="tl-col">
+          <div class="sheets-panel-label">再生 FPS</div>
+          <input class="sheets-url-input tl-num" id="tl-fps" type="number" min="1" max="60" step="1">
+        </div>
+      </div>
+
+      <div class="sheets-panel-label">解像度</div>
+      <select class="tl-select" id="tl-resolution">
+        <option value="640x480">640×480 (軽量)</option>
+        <option value="1280x720">1280×720 (HD)</option>
+        <option value="1920x1080">1920×1080 (FHD)</option>
+      </select>
+
+      <div class="sheets-panel-status" id="tl-status"></div>
+      <div class="sheets-panel-actions">
+        <button class="sheets-cancel-btn" id="tl-cancel-btn">キャンセル</button>
+        <button class="sheets-save-btn" id="tl-save-btn">保存</button>
+      </div>
+      <button class="sheets-bulk-btn" id="tl-open-folder-btn">保存フォルダを開く</button>
     </div>
 
   </div>
