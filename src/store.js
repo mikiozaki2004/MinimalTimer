@@ -110,7 +110,11 @@ async function syncFromFile() {
   const raw = await invoke('read_data_file', { path });
   const syncedAt = Number(readLocal('mt_data_synced_at')) || 0;
   const modifiedAt = Number(readLocal('mt_data_modified_at')) || 0;
-  const localDirty = modifiedAt > syncedAt;
+  // 一度も同期していない環境に既存ログがある場合（旧バージョンからの移行）は
+  // 「ローカルに変更あり」として扱い、ファイル側で上書きせず必ず統合する
+  const localLogs = readLocal('mt_logs');
+  const neverSyncedWithData = syncedAt === 0 && Array.isArray(localLogs) && localLogs.length > 0;
+  const localDirty = modifiedAt > syncedAt || neverSyncedWithData;
 
   if (raw == null) {
     // ファイル未作成（初回移行）→ 現在のローカルデータで作成
@@ -134,8 +138,13 @@ async function syncFromFile() {
     return;
   }
   if (localDirty) {
-    // 両方に変更あり → ログはID単位で統合、その他はファイル側を採用して書き戻す
+    // 両方に変更あり → ログはID単位・タスクは名前単位で統合、
+    // その他はファイル側を優先しつつ、ファイルに無いキーはローカル値を残す
     data.mt_logs = mergeLogs(readLocal('mt_logs'), data.mt_logs);
+    data.mt_tasks = mergeTasks(readLocal('mt_tasks'), data.mt_tasks);
+    for (const key of SYNC_KEYS) {
+      if (data[key] === undefined && readLocal(key) !== undefined) data[key] = readLocal(key);
+    }
     adoptFileData(data);
     await flushStorage();
   } else {
@@ -159,12 +168,36 @@ function mergeLogs(a, b) {
   const byId = new Map();
   for (const s of [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]) {
     if (!s || typeof s !== 'object') continue;
-    const id = s.id ?? `${s.startedAt}-${s.endedAt}-${s.task}`;
+    // id を持たない旧形式エントリは時刻+タスク+長さで同一判定する
+    const id = s.id
+      ?? `${s.startedAt ?? s.timestamp ?? ''}-${s.endedAt ?? s.timestamp ?? ''}-${s.task ?? ''}-${s.duration ?? ''}`;
     if (!byId.has(id)) byId.set(id, s);
   }
   return [...byId.values()].sort(
     (x, y) => (x.endedAt ?? x.timestamp ?? 0) - (y.endedAt ?? y.timestamp ?? 0),
   );
+}
+
+function mergeTasks(a, b) {
+  const norm = (raw) => (Array.isArray(raw) ? raw : []).map((t) =>
+    typeof t === 'string'
+      ? { name: t, details: [] }
+      : {
+          name: String(t?.name ?? '').trim(),
+          details: Array.isArray(t?.details) ? t.details.map(String).filter(Boolean) : [],
+        },
+  ).filter((t) => t.name);
+  const out = new Map();
+  // ファイル側の並びを優先し、ローカルのみのタスクは後ろに追加
+  for (const t of [...norm(b), ...norm(a)]) {
+    const cur = out.get(t.name);
+    if (!cur) {
+      out.set(t.name, { name: t.name, details: [...t.details] });
+    } else {
+      for (const d of t.details) if (!cur.details.includes(d)) cur.details.push(d);
+    }
+  }
+  return [...out.values()];
 }
 
 let _writeTimer = null;
