@@ -653,6 +653,53 @@ fn run_excel_export_script(_json_path: &str) -> Result<String, String> {
     Err("Excel出力はWindows版のみ対応しています".into())
 }
 
+// ── Synced data file ───────────────────────────────────────────────
+
+/// データファイルの既定パス。OneDrive があればその中、なければ AppData
+#[tauri::command]
+fn get_default_data_path(app: tauri::AppHandle) -> Result<String, String> {
+    if let Ok(onedrive) = std::env::var("OneDrive") {
+        let dir = PathBuf::from(onedrive);
+        if dir.is_dir() {
+            return Ok(dir
+                .join("MinimalTimer")
+                .join("data.json")
+                .to_string_lossy()
+                .to_string());
+        }
+    }
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("AppData ディレクトリを取得できません: {}", e))?;
+    Ok(dir.join("data.json").to_string_lossy().to_string())
+}
+
+/// データファイルを読む。未作成なら None
+#[tauri::command]
+fn read_data_file(path: String) -> Result<Option<String>, String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Ok(None);
+    }
+    fs::read_to_string(&p)
+        .map(Some)
+        .map_err(|e| format!("データファイルの読み込みに失敗: {}", e))
+}
+
+/// データファイルへ書き込む。一時ファイル経由で置き換え、同期中の破損を防ぐ
+#[tauri::command]
+fn write_data_file(path: String, contents: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if let Some(parent) = p.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("フォルダ作成に失敗: {}", e))?;
+    }
+    let tmp = p.with_extension("json.tmp");
+    fs::write(&tmp, contents).map_err(|e| format!("データファイルの書き込みに失敗: {}", e))?;
+    fs::rename(&tmp, &p).map_err(|e| format!("データファイルの置き換えに失敗: {}", e))?;
+    Ok(())
+}
+
 // ── Timelapse ──────────────────────────────────────────────────────
 
 fn timelapses_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -764,6 +811,9 @@ pub fn run() {
             set_cursor_passthrough,
             save_timelapse_mp4,
             open_timelapses_folder,
+            get_default_data_path,
+            read_data_file,
+            write_data_file,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -785,7 +835,8 @@ pub fn run() {
                     }
                     let app = window.app_handle().clone();
                     std::thread::spawn(move || {
-                        std::thread::sleep(std::time::Duration::from_millis(200));
+                        // セッション記録とデータファイル書き込みの完了を待つ
+                        std::thread::sleep(std::time::Duration::from_millis(600));
                         app.exit(0);
                     });
                 }

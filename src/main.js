@@ -1,4 +1,4 @@
-import { initStorage, storageGet, storageSet } from './store.js';
+import { initStorage, storageGet, storageSet, flushStorage, getDataFilePath, setDataFilePath } from './store.js';
 import { initWater, resetWater, ensureLoop as waterEnsureLoop } from './water.js';
 import * as timelapse from './timelapse.js';
 
@@ -732,6 +732,65 @@ document.addEventListener('click', (e) => {
   if (!ctxMenu.contains(e.target) && e.target !== btnRecords) closeCtxMenu();
 });
 
+// ── Data file path panel ───────────────────────────────────────────
+const ctxDatapathSetup = document.getElementById('ctx-datapath-setup');
+const dpPanel = document.getElementById('datapath-panel');
+const dpInput = document.getElementById('datapath-input');
+const dpStatus = document.getElementById('datapath-status');
+const dpCancelBtn = document.getElementById('datapath-cancel-btn');
+const dpSaveBtn = document.getElementById('datapath-save-btn');
+
+async function openDatapathPanel() {
+  dpInput.value = await getDataFilePath();
+  dpStatus.textContent = '';
+  dpPanel.classList.add('open');
+  dpInput.focus();
+}
+
+function closeDatapathPanel() {
+  dpPanel.classList.add('closing');
+  dpPanel.addEventListener('animationend', () => {
+    dpPanel.classList.remove('open', 'closing');
+  }, { once: true });
+}
+
+ctxDatapathSetup.addEventListener('click', () => {
+  closeCtxMenu();
+  if (sheetsPanel.classList.contains('open')) closeSheetsPanel();
+  const tlPanelEl = document.getElementById('timelapse-panel');
+  if (tlPanelEl.classList.contains('open')) {
+    tlPanelEl.classList.add('closing');
+    tlPanelEl.addEventListener('animationend', () => {
+      tlPanelEl.classList.remove('open', 'closing');
+    }, { once: true });
+  }
+  openDatapathPanel();
+});
+
+dpCancelBtn.addEventListener('click', () => closeDatapathPanel());
+
+dpSaveBtn.addEventListener('click', async () => {
+  dpStatus.textContent = '切り替え中...';
+  try {
+    const resolved = await setDataFilePath(dpInput.value);
+    dpInput.value = resolved;
+    // 既存ファイルからの統合結果をメモリ上のログへ反映
+    logs = storageGet('mt_logs', []);
+    dpStatus.textContent = '保存しました';
+    setTimeout(() => closeDatapathPanel(), 800);
+  } catch (e) {
+    dpStatus.textContent = `保存に失敗: ${e}`;
+  }
+});
+
+dpInput.addEventListener('mousedown', (e) => e.stopPropagation());
+dpInput.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { e.preventDefault(); dpSaveBtn.click(); }
+  if (e.key === 'Escape') closeDatapathPanel();
+});
+dpPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+
 // ── Timelapse settings panel ───────────────────────────────────────
 const ctxTimelapseSetup = document.getElementById('ctx-timelapse-setup');
 const tlPanel        = document.getElementById('timelapse-panel');
@@ -789,6 +848,7 @@ function escapeHtml(s) {
 ctxTimelapseSetup.addEventListener('click', () => {
   closeCtxMenu();
   if (sheetsPanel.classList.contains('open')) closeSheetsPanel();
+  if (dpPanel.classList.contains('open')) closeDatapathPanel();
   openTimelapsePanel();
 });
 
@@ -1034,6 +1094,8 @@ window.__saveSessionOnExit = async () => {
   }
   const pos = await window.__TAURI__?.core?.invoke?.('get_window_position');
   if (pos) storageSet('mt_window_pos', pos);
+  // 保留中のデータファイル書き込みを終了前に確定させる
+  await flushStorage();
 };
 
 // ── Scroll → resize window (Ctrl) or adjust countdown total ───────────────
@@ -1056,7 +1118,8 @@ circle.addEventListener('wheel', (e) => {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 (async () => {
-  await initStorage();
+  // main ウィンドウのみ同期ファイルとの取り込み・書き出しを行う
+  await initStorage({ syncFile: true });
 
   timelapse.loadSettings();
 
