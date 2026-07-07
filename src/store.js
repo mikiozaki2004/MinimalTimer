@@ -52,6 +52,16 @@ export function storageGet(key, def = null) {
   return v !== undefined ? v : def;
 }
 
+// localStorage から常に最新値を読む（他ウィンドウでの変更を取り込む）。
+// mt_logs のように複数ウィンドウが書き込むキーは、変更前にこれで再取得しないと
+// 古いキャッシュで上書きして他ウィンドウの編集を消してしまう。
+export function storageGetFresh(key, def = null) {
+  const v = readLocal(key);
+  if (v === undefined) return def;
+  _cache[key] = v;
+  return v;
+}
+
 export async function storageSet(key, value) {
   writeLocal(key, value);
   if (SYNC_KEYS.includes(key)) {

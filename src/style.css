@@ -16,6 +16,14 @@
   --ring-dim: rgba(88, 166, 255, 0.15);
   --fg: #E6EDF3;
   --transition-color: color 0.4s ease, background 0.4s ease, stroke 0.4s ease;
+  --font-ui: 'Segoe UI Variable Display', 'Segoe UI', 'Helvetica Neue', 'Arial', sans-serif;
+  /* テーマ色のグロー（--ring は使用箇所のコンテキストで解決されるため
+     休憩モードやテーマ切替にも自動で追従する） */
+  --timer-glow: 0 0 26px color-mix(in srgb, var(--ring) 30%, transparent);
+  --ring-glow: drop-shadow(0 0 5px color-mix(in srgb, var(--ring) 50%, transparent));
+  --circle-sheen: radial-gradient(circle at 50% 26%, rgba(255, 255, 255, 0.05), transparent 58%);
+  --circle-depth: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -22px 46px rgba(0, 0, 0, 0.18);
+  --panel-shadow: 0 10px 32px rgba(0, 0, 0, 0.38);
 }
 
 html,
@@ -32,6 +40,7 @@ body {
   height: 280px;
   border-radius: 50%;
   background: var(--bg);
+  box-shadow: var(--circle-depth);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -40,6 +49,16 @@ body {
   gap: 4px;
   cursor: default;
   transition: background 0.4s ease;
+}
+
+/* ガラスの光沢（上部シーン） */
+.circle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--circle-sheen);
+  pointer-events: none;
 }
 
 /* ── Water fill canvas ──────────────────────────────────────────── */
@@ -73,11 +92,12 @@ body {
 .ring-progress {
   fill: none;
   stroke: var(--ring);
-  stroke-width: 2.5;
+  stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 791.68;
   /* 2π × 126 */
   stroke-dashoffset: 0;
+  filter: var(--ring-glow);
   transition: stroke-dashoffset 0.5s linear, stroke 0.4s ease;
 }
 
@@ -124,12 +144,14 @@ body {
 
 /* ── Timer text ──────────────────────────────────────────────────── */
 .timer {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 52px;
-  font-weight: 100;
-  letter-spacing: -2px;
+  font-weight: 200;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--fg);
+  text-shadow: var(--timer-glow);
   transition: var(--transition-color);
 }
 
@@ -140,10 +162,11 @@ body {
 /* ── Timer input (edit mode) ─────────────────────────────────────── */
 .timer-input {
   display: none;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 52px;
-  font-weight: 100;
-  letter-spacing: -2px;
+  font-weight: 200;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--fg);
   background: transparent;
@@ -159,11 +182,13 @@ body {
 
 /* ── Clock text ──────────────────────────────────────────────────── */
 .clock {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
-  font-size: 17px;
+  font-family: var(--font-ui);
+  font-size: 16px;
   font-weight: 300;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
   color: var(--fg);
-  opacity: 0.65;
+  opacity: 0.55;
   transition: var(--transition-color);
 }
 
@@ -171,12 +196,23 @@ body {
 /* ── Control buttons ─────────────────────────────────────────────── */
 .controls {
   position: absolute;
-  bottom: 72px;
+  bottom: 70px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 2px;
+}
+
+/* 主操作ボタンはひと回り大きく */
+.controls .btn {
+  width: 34px;
+  height: 34px;
+}
+
+.controls .btn svg {
+  width: 25px;
+  height: 25px;
 }
 
 /* ── Secondary button arc positions (r=100px, bottom arc 40°〜140°) ─ */
@@ -210,7 +246,8 @@ body {
 
 .btn:hover,
 .btn-pin:hover {
-  background: rgba(255, 255, 255, 0.10);
+  background: color-mix(in srgb, var(--ring) 16%, transparent);
+  color: var(--ring);
   transform: scale(1.12);
 }
 
@@ -240,12 +277,12 @@ body {
 
 /* ── Task name display ───────────────────────────────────────────── */
 .task-name {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 15px;
   font-weight: 300;
   letter-spacing: 0.5px;
   color: var(--fg);
-  opacity: 1.75;
+  opacity: 0.85;
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -272,7 +309,7 @@ body {
   position: absolute;
   bottom: 16px;
   left: 50%;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   color: #4ADE80;
   opacity: 0;
@@ -311,6 +348,7 @@ body {
 
 .pomo-dot.current {
   background: var(--ring);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ring) 70%, transparent);
 }
 
 
@@ -337,9 +375,11 @@ body {
   left: 50%;
   transform: translate(-50%, -46%);
   width: 196px;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
+  box-shadow: var(--panel-shadow);
   z-index: 10;
   overflow: hidden;
   transition: background 0.4s ease, border-color 0.4s ease;
@@ -372,7 +412,7 @@ body {
   display: flex;
   align-items: center;
   padding: 5px 14px;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
   color: var(--fg);
   cursor: pointer;
@@ -491,7 +531,7 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   outline: none;
   color: var(--fg);
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   padding: 2px 0;
   user-select: text;
@@ -536,7 +576,7 @@ body {
 }
 
 .records-title {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 400;
   color: var(--fg);
@@ -552,7 +592,7 @@ body {
 .records-tab {
   background: none;
   border: none;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   color: var(--fg);
   opacity: 0.4;
@@ -609,7 +649,7 @@ body {
 }
 
 .records-row-name {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   color: var(--fg);
   opacity: 0.8;
@@ -620,7 +660,7 @@ body {
 }
 
 .records-row-time {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   color: var(--ring);
   white-space: nowrap;
@@ -628,7 +668,7 @@ body {
 }
 
 .records-empty {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   color: var(--fg);
   opacity: 0.3;
@@ -646,7 +686,7 @@ body {
 }
 
 .records-total {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   color: var(--fg);
   opacity: 0.6;
@@ -655,7 +695,7 @@ body {
 .records-reset {
   background: none;
   border: none;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   color: var(--fg);
   opacity: 0.3;
@@ -675,6 +715,12 @@ body.light {
   --ring: #2563EB;
   --ring-dim: rgba(37, 99, 235, 0.15);
   --fg: #1E293B;
+  /* 明色背景ではグローを抑える */
+  --timer-glow: none;
+  --ring-glow: drop-shadow(0 0 4px color-mix(in srgb, var(--ring) 30%, transparent));
+  --circle-sheen: radial-gradient(circle at 50% 26%, rgba(255, 255, 255, 0.6), transparent 58%);
+  --circle-depth: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -22px 46px rgba(30, 41, 59, 0.07);
+  --panel-shadow: 0 10px 32px rgba(30, 41, 59, 0.18);
 }
 
 /* Sunset */
@@ -713,13 +759,14 @@ body.sunset .circle.break-mode {
   position: absolute;
   top: 88px;
   right: 34px;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
+  box-shadow: var(--panel-shadow);
   z-index: 30;
   overflow: hidden;
   white-space: nowrap;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px) saturate(1.3);
 }
 
 .ctx-menu.open {
@@ -732,7 +779,7 @@ body.sunset .circle.break-mode {
   background: none;
   border: none;
   color: var(--fg);
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   padding: 7px 14px;
   cursor: pointer;
@@ -790,9 +837,11 @@ body.sunset .circle.break-mode {
   left: 50%;
   transform: translate(-50%, -50%);
   width: 230px;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
+  box-shadow: var(--panel-shadow);
   z-index: 20;
   padding: 14px 16px 16px;
   text-align: center;
@@ -809,7 +858,7 @@ body.sunset .circle.break-mode {
 }
 
 .sheets-panel-title {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   font-weight: 400;
   color: var(--fg);
@@ -820,7 +869,7 @@ body.sunset .circle.break-mode {
 }
 
 .sheets-panel-desc {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   color: var(--fg);
   opacity: 0.4;
@@ -830,7 +879,7 @@ body.sunset .circle.break-mode {
 }
 
 .sheets-panel-label {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 9px;
   color: var(--fg);
   opacity: 0.45;
@@ -845,7 +894,7 @@ body.sunset .circle.break-mode {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   color: var(--fg);
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 9px;
   padding: 6px 8px;
   outline: none;
@@ -858,7 +907,7 @@ body.sunset .circle.break-mode {
 }
 
 .sheets-panel-status {
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   min-height: 16px;
   margin-top: 6px;
@@ -878,7 +927,7 @@ body.sunset .circle.break-mode {
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: var(--fg);
   cursor: pointer;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   padding: 5px 14px;
   border-radius: 20px;
@@ -893,7 +942,7 @@ body.sunset .circle.break-mode {
   border: none;
   color: #fff;
   cursor: pointer;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   padding: 5px 14px;
   border-radius: 20px;
@@ -909,7 +958,7 @@ body.sunset .circle.break-mode {
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: var(--fg);
   cursor: pointer;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   padding: 5px 0;
   border-radius: 6px;
@@ -925,7 +974,7 @@ body.sunset .circle.break-mode {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   color: var(--fg);
   opacity: 0.85;
@@ -955,7 +1004,7 @@ body.sunset .circle.break-mode {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   color: var(--fg);
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   padding: 5px 6px;
   outline: none;
@@ -974,7 +1023,7 @@ body.sunset .circle.break-mode {
   left: 50px;
   align-items: center;
   gap: 4px;
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: var(--font-ui);
   font-size: 9px;
   font-weight: 500;
   color: #F87171;
@@ -1008,7 +1057,11 @@ html.completion body {
 html.completion .circle {
   width: 400px;
   height: 400px;
-  animation: completion-pulse 2s ease-in-out infinite;
+  animation: completion-pulse 1.8s ease-in-out infinite;
+}
+
+html.completion .timer {
+  text-shadow: 0 0 32px color-mix(in srgb, var(--ring) 55%, transparent);
 }
 
 html.completion .ctrl-fade {
@@ -1020,7 +1073,7 @@ html.completion .ctrl-fade {
 
   0%,
   100% {
-    opacity: 0.12;
+    opacity: 0.4;
   }
 
   50% {

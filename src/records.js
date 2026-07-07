@@ -1,4 +1,4 @@
-import { initStorage, storageGet, storageSet } from './store.js';
+import { initStorage, storageGet, storageGetFresh, storageSet } from './store.js';
 
 // ── State ───────────────────────────────────────────────────────────────────
 let logs = [];
@@ -473,8 +473,18 @@ function renderTimelineTotals(segments) {
 }
 
 // ── Delete Session ────────────────────────────────────────────────────────────
+function sameSession(a, b) {
+  if (a === b) return true;
+  if (a.id && b.id) return a.id === b.id;
+  return a.task === b.task
+    && a.duration === b.duration
+    && (a.endedAt ?? a.timestamp) === (b.endedAt ?? b.timestamp);
+}
+
 function deleteSession(entry) {
-  const idx = logs.indexOf(entry);
+  // メインウィンドウが追記した最新の状態を取り込んでから削除する
+  logs = storageGetFresh('mt_logs', logs);
+  const idx = logs.findIndex(l => sameSession(l, entry));
   if (idx === -1) return;
   logs.splice(idx, 1);
   storageSet('mt_logs', logs);
@@ -561,6 +571,7 @@ async function submitAddForm() {
 
   if (durationSec <= 0) return;
 
+  logs = storageGetFresh('mt_logs', logs);
   logs.push({
     id: Math.random().toString(36).slice(2),
     task,
@@ -710,6 +721,7 @@ async function submitTimelineModal() {
   const taskName = memo || cat.name;
   const durationSec = Math.round((range.endMs - range.startMs) / 1000);
 
+  logs = storageGetFresh('mt_logs', logs);
   logs.push({
     id: Math.random().toString(36).slice(2),
     task: taskName,

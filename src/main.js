@@ -1,4 +1,4 @@
-import { initStorage, storageGet, storageSet, flushStorage, getDataFilePath, setDataFilePath } from './store.js';
+import { initStorage, storageGet, storageGetFresh, storageSet, flushStorage, getDataFilePath, setDataFilePath } from './store.js';
 import { initWater, resetWater, ensureLoop as waterEnsureLoop } from './water.js';
 import * as timelapse from './timelapse.js';
 
@@ -1038,6 +1038,8 @@ function logSession({ sync = true } = {}) {
     mode: st.mode,
     isBreak: st.breakMode,
   };
+  // 記録ウィンドウでの削除・追加を上書きしないよう最新値へ追記する
+  logs = storageGetFresh('mt_logs', []);
   logs.push(session);
   storageSet('mt_logs', logs);
   if (sync) syncSessionIntegrations(session);
@@ -1058,6 +1060,7 @@ function logOvertimeSession({ sync = true } = {}) {
     mode: 'countup',
     isBreak: false,
   };
+  logs = storageGetFresh('mt_logs', []);
   logs.push(session);
   storageSet('mt_logs', logs);
   if (sync) syncSessionIntegrations(session);
