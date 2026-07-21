@@ -1080,3 +1080,178 @@ html.completion .ctrl-fade {
     opacity: 1;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Note / Chalk template （縦長長方形・作業リスト）
+   ══════════════════════════════════════════════════════════════════ */
+
+/* テンプレート切替（円 ⇔ ノート） */
+.note-tpl { display: none; }
+html[data-template="note"]  .circle,
+html[data-template="chalk"] .circle { display: none !important; }
+html[data-template="note"]  .note-tpl,
+html[data-template="chalk"] .note-tpl { display: block; }
+
+.note-tpl {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  padding-top: 15px;
+  color: var(--nt-ink);
+  cursor: default;
+  /* Paper（ライト・既定） */
+  --nt-paper: #FBF6E9;
+  --nt-rule: rgba(90,120,150,.22);
+  --nt-margin: rgba(200,70,60,.40);
+  --nt-ink: #3A362E;
+  --nt-pencil: #8A8577;
+  --nt-redpen: #C0392B;
+  --nt-marker: rgba(255,214,79,.60);
+  --nt-accent: #C2410C;
+  background: var(--nt-paper);
+  box-shadow: inset 0 0 40px rgba(120,90,40,.05), inset 0 1px 0 rgba(255,255,255,.5);
+  transition: background .4s ease, color .4s ease;
+}
+/* Chalk（黒板・ダーク） */
+html[data-template="chalk"] .note-tpl {
+  --nt-paper: #26302B;
+  --nt-rule: rgba(255,255,255,.12);
+  --nt-margin: rgba(226,122,107,.5);
+  --nt-ink: #ECE7D6;
+  --nt-pencil: rgba(236,231,214,.55);
+  --nt-redpen: #E27A6B;
+  --nt-marker: rgba(240,220,120,.28);
+  --nt-accent: #E9B872;
+  box-shadow: inset 0 0 60px rgba(0,0,0,.25);
+}
+
+/* リング綴じ */
+.nt-binding { position: absolute; top: 5px; left: 14px; right: 14px; height: 9px;
+  display: flex; justify-content: space-between; z-index: 3; pointer-events: none; }
+.nt-binding i { width: 7px; height: 9px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(0,0,0,.28), rgba(0,0,0,.08) 60%, transparent 70%);
+  box-shadow: inset 0 -1px 1px rgba(255,255,255,.4); }
+html[data-template="chalk"] .nt-binding i { background: radial-gradient(circle at 50% 35%, rgba(0,0,0,.5), transparent 70%); }
+
+.nt-bar { display: flex; align-items: center; gap: 8px; padding: 2px 14px 0;
+  color: var(--nt-pencil); font-size: 12px; }
+.nt-pin, .nt-chev, .nt-b { background: none; border: none; cursor: pointer; color: inherit;
+  font-family: inherit; }
+.nt-pin { color: var(--nt-accent); font-size: 13px; opacity: .9; }
+.nt-pin.pinned { opacity: 1; }
+.nt-date { font-family: 'Zen Kurenaido','Yomogi',var(--font-ui); letter-spacing: .5px; }
+.nt-sp { flex: 1; }
+.nt-clock { font-variant-numeric: tabular-nums; }
+.nt-chev { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: var(--nt-pencil); transition: transform .38s cubic-bezier(.4,0,.2,1), background .15s; }
+.nt-chev:hover { background: rgba(0,0,0,.05); }
+.nt-chev svg { width: 13px; height: 13px; }
+.note-tpl:not(.collapsed) .nt-chev { transform: rotate(180deg); }
+
+.nt-timerzone { text-align: center; padding: 4px 14px 0; cursor: pointer; }
+.nt-big { font-family: 'Georgia', serif; font-size: 46px; font-weight: 400; letter-spacing: -1px;
+  line-height: 1; font-variant-numeric: tabular-nums; color: var(--nt-ink); }
+.nt-timer-input { display: none; font-family: 'Georgia', serif; font-size: 46px; font-weight: 400;
+  text-align: center; width: 160px; background: transparent; border: none;
+  border-bottom: 1px solid var(--nt-accent); outline: none; color: var(--nt-ink);
+  user-select: text; -webkit-user-select: text; font-variant-numeric: tabular-nums; }
+.nt-uline { position: relative; height: 8px; margin: 5px 34px 0; }
+.nt-uline::before { content: ''; position: absolute; left: 0; right: 0; top: 3px; height: 2px;
+  background: repeating-linear-gradient(90deg, var(--nt-pencil) 0 3px, transparent 3px 5px); opacity: .5; }
+.nt-uline > i { position: absolute; left: 0; top: 2px; height: 3px; width: 0%; background: var(--nt-accent);
+  border-radius: 2px; transition: width .5s linear; }
+.nt-tally { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 9px;
+  font-size: 10.5px; color: var(--nt-pencil); min-height: 15px; }
+.nt-tally .marks { display: flex; gap: 4px; }
+.nt-tally .marks i { width: 2.5px; height: 14px; background: var(--nt-pencil); opacity: .3;
+  border-radius: 2px; transform: rotate(-8deg); }
+.nt-tally .marks i.on { opacity: .9; background: var(--nt-ink); }
+
+/* 開閉領域 */
+.nt-expand { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .38s cubic-bezier(.4,0,.2,1); }
+.note-tpl.collapsed .nt-expand { grid-template-rows: 0fr; }
+.nt-expand-inner { overflow: hidden; }
+
+/* 罫線＋マージンの紙面 */
+.nt-paper { position: relative; margin-top: 8px;
+  background: repeating-linear-gradient(transparent 0 29px, var(--nt-rule) 29px 30px);
+  background-position: 0 6px; }
+.nt-paper::before { content: ''; position: absolute; left: 30px; top: 0; bottom: 0; width: 1.5px;
+  background: var(--nt-margin); }
+.nt-sect { font-family: 'Yomogi', var(--font-ui); font-size: 13px; color: var(--nt-ink);
+  padding: 6px 0 4px 42px; position: relative; }
+.nt-sect::after { content: ''; position: absolute; left: 42px; bottom: 2px; width: 52px; height: 4px;
+  background: var(--nt-marker); border-radius: 3px; opacity: .7; }
+
+.nt-list { padding: 0 14px 4px; min-height: 30px; }
+.list-empty { padding: 6px 0 6px 44px; font-family: 'Yomogi', var(--font-ui); font-size: 12px;
+  color: var(--nt-pencil); opacity: .7; }
+
+/* リスト行（tasks.js が描画） */
+.nt-list .row { display: flex; align-items: center; gap: 9px; height: 30px; padding-left: 28px;
+  position: relative; font-family: 'Yomogi', var(--font-ui); font-size: 13px; color: var(--nt-ink); }
+.nt-list .chk { width: 16px; height: 16px; border: 1.6px solid var(--nt-pencil);
+  border-radius: 4px 5px 4px 6px; transform: rotate(-2deg); position: relative; cursor: pointer; flex: 0 0 auto; }
+.nt-list .chk.ghost { opacity: .35; }
+.nt-list .row.done .chk::after { content: '✓'; position: absolute; left: 1px; top: -5px; font-size: 16px;
+  color: var(--nt-redpen); font-family: 'Georgia'; transform: rotate(-6deg); }
+.nt-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  position: relative; cursor: pointer; }
+.nt-list .row.run .name { background: linear-gradient(var(--nt-marker), var(--nt-marker));
+  background-size: 100% 62%; background-repeat: no-repeat; background-position: 0 60%;
+  padding: 0 3px; border-radius: 2px; }
+.nt-list .row.done .name { color: var(--nt-pencil); text-decoration: line-through;
+  text-decoration-color: var(--nt-redpen); text-decoration-thickness: 1.5px; cursor: default; }
+.nt-list .t { font-family: 'Yomogi', var(--font-ui); font-size: 11px; color: var(--nt-pencil);
+  font-variant-numeric: tabular-nums; }
+.nt-list .row.run .t { color: #8a6b1f; }
+html[data-template="chalk"] .nt-list .row.run .t { color: #e9d27a; }
+.nt-list .row-add { margin-left: 4px; color: var(--nt-accent); font-size: 13px; opacity: 0;
+  cursor: pointer; transition: opacity .15s; }
+.nt-list .row:hover .row-add { opacity: .6; }
+.nt-list .row-add:hover { opacity: 1 !important; }
+
+/* 親（グループ） */
+.nt-list .row.parent .name { font-size: 14px; }
+.nt-list .tri { position: absolute; left: 7px; top: 50%; transform: translateY(-50%);
+  color: var(--nt-pencil); cursor: pointer; font-size: 9px; user-select: none; }
+.nt-list .row.parent.carried .name::before,
+.nt-list .row.carried:not(.parent) .name::before { content: '↪ '; color: var(--nt-redpen); font-family: 'Georgia'; }
+.nt-list .row.parent.anyrun:not(.done) .name { background: linear-gradient(var(--nt-marker), var(--nt-marker));
+  background-size: 100% 40%; background-repeat: no-repeat; background-position: 0 82%; padding: 0 3px; border-radius: 2px; }
+.nt-list .agg { font-family: 'Yomogi', var(--font-ui); font-size: 10.5px; color: var(--nt-pencil);
+  white-space: nowrap; flex: 0 0 auto; }
+.nt-list .agg .prog { color: var(--nt-accent); }
+.nt-list .children { position: relative; margin-left: 40px; }
+.nt-list .children::before { content: ''; position: absolute; left: 0; top: -3px; bottom: 15px;
+  width: 1.5px; background: var(--nt-pencil); opacity: .45; }
+.nt-list .row.child { padding-left: 16px; }
+.nt-list .row.child .name { font-size: 12px; }
+.nt-list .row.child::before { content: ''; position: absolute; left: 0; top: 50%; width: 11px;
+  height: 1.5px; background: var(--nt-pencil); opacity: .45; }
+.nt-list .inline-add-input { flex: 1; border: none; background: none; outline: none;
+  font-family: 'Yomogi', var(--font-ui); font-size: 12px; color: var(--nt-ink); }
+
+/* 追加欄 */
+.nt-add { display: flex; align-items: center; gap: 9px; height: 30px; padding-left: 44px;
+  font-family: 'Yomogi', var(--font-ui); font-size: 12.5px; color: var(--nt-pencil); }
+.nt-plus { color: var(--nt-accent); }
+.nt-add-input { flex: 1; border: none; background: none; outline: none;
+  font-family: 'Yomogi', var(--font-ui); font-size: 12.5px; color: var(--nt-ink);
+  user-select: text; -webkit-user-select: text; }
+.nt-add-input::placeholder { color: var(--nt-pencil); opacity: .7; }
+
+/* 操作バー（ホバーで濃く） */
+.nt-toolbar { display: flex; align-items: center; justify-content: center; gap: 4px; height: 44px;
+  border-top: 1px dashed rgba(0,0,0,.12); margin-top: 4px; }
+html[data-template="chalk"] .nt-toolbar { border-top-color: rgba(255,255,255,.12); }
+.nt-b { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; color: var(--nt-pencil); font-size: 14px; transition: background .15s, color .15s; }
+.nt-b:hover { color: var(--nt-accent); background: rgba(0,0,0,.05); }
+html[data-template="chalk"] .nt-b:hover { background: rgba(255,255,255,.08); }
+.nt-b.primary { color: var(--nt-ink); }
+.nt-b.active { color: var(--nt-accent); }
+.nt-sep { width: 1px; height: 16px; background: rgba(0,0,0,.12); margin: 0 3px; }
+html[data-template="chalk"] .nt-sep { background: rgba(255,255,255,.12); }

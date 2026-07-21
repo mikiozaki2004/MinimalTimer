@@ -101,6 +101,7 @@
 
     <!-- Records context menu -->
     <div class="ctx-menu" id="records-ctx-menu">
+      <button class="ctx-menu-item" id="ctx-template">デザインテンプレート切替</button>
       <button class="ctx-menu-item" id="ctx-sheets-setup">Excel / Sheets 連携</button>
       <button class="ctx-menu-item" id="ctx-timelapse-setup">タイムラプス設定</button>
       <button class="ctx-menu-item" id="ctx-datapath-setup">データ保存先</button>
@@ -177,6 +178,51 @@
     </div>
 
   </div>
+
+  <!-- ── Note / Chalk template (縦長長方形・作業リスト) ─────────────── -->
+  <div class="note-tpl" id="note-tpl" data-tauri-drag-region>
+    <div class="nt-binding" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+    <div class="nt-bar">
+      <button class="nt-pin" id="note-pin" title="最前面固定">📌</button>
+      <span class="nt-date" id="note-date" data-tauri-drag-region>7/21</span>
+      <span class="nt-sp" data-tauri-drag-region></span>
+      <span class="nt-clock" id="note-clock" data-tauri-drag-region></span>
+      <button class="nt-chev" id="note-chev" title="作業リストを開閉">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <div class="nt-timerzone" id="note-timerzone" data-tauri-drag-region>
+      <div class="nt-big" id="note-timer">25:00</div>
+      <input class="nt-timer-input" id="note-timer-input" type="text" maxlength="8" placeholder="25:00">
+      <div class="nt-uline"><i id="note-progress"></i></div>
+      <div class="nt-tally" id="note-tally"></div>
+    </div>
+
+    <div class="nt-expand" id="note-expand">
+      <div class="nt-expand-inner">
+        <div class="nt-paper">
+          <div class="nt-sect">やること</div>
+          <div class="nt-list" id="note-list"></div>
+          <div class="nt-add" id="note-add-row">
+            <span class="nt-plus">＋</span>
+            <input class="nt-add-input" id="note-add-input" type="text" maxlength="40" placeholder="書き足す…">
+          </div>
+        </div>
+        <div class="nt-toolbar">
+          <button class="nt-b primary" id="note-play" title="開始 / 停止（記録）">▶</button>
+          <button class="nt-b" id="note-pause" title="一時停止" style="display:none">⏸</button>
+          <button class="nt-b" id="note-reset" title="リセット">⟳</button>
+          <span class="nt-sep"></span>
+          <button class="nt-b" id="note-break" title="休憩">☕</button>
+          <button class="nt-b" id="note-pomo" title="ポモドーロ">🍅</button>
+          <button class="nt-b" id="note-template-btn" title="テンプレート切替">🎨</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="main.js" type="module"></script>
 </body>
 

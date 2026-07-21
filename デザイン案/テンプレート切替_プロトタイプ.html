@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MinimalTimer — テンプレート切替 プロトタイプ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{
+    font-family:'Zen Kurenaido','Segoe UI',sans-serif; color:#3A362E;
+    background:
+      radial-gradient(900px 500px at 15% -10%, #e7ddc8 0%, transparent 55%),
+      linear-gradient(160deg,#dcd6c7 0%,#d0c9b8 100%);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:40px;
+  }
+  .head{ text-align:center; }
+  .head h1{ font-size:19px; font-weight:600; font-family:'Yomogi',cursive; }
+  .head p{ font-size:12px; color:rgba(58,54,46,.6); margin-top:6px; }
+
+  /* テンプレート選択セグメント */
+  .picker{ display:flex; gap:4px; background:rgba(255,255,255,.5); border:1px solid rgba(0,0,0,.08);
+    border-radius:12px; padding:4px; box-shadow:0 6px 18px rgba(40,34,20,.12); }
+  .picker button{ font-family:'Yomogi',cursive; font-size:12.5px; color:#6b6558; background:none; border:none;
+    padding:7px 16px; border-radius:9px; cursor:pointer; transition:.18s; display:flex; align-items:center; gap:6px; }
+  .picker button:hover{ color:#3A362E; }
+  .picker button.on{ background:#fff; color:#C2410C; box-shadow:0 2px 6px rgba(0,0,0,.12); }
+
+  .stage{ min-height:490px; display:flex; align-items:center; justify-content:center; }
+  .tpl{ display:none; } .tpl.show{ display:block; animation:fade .35s ease both; }
+  @keyframes fade{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  .foot{ font-size:11px; color:rgba(58,54,46,.5); text-align:center; line-height:1.7; }
+
+  /* ═══════════ ノート / 黒板（縦長長方形） ═══════════ */
+  .note{
+    position:relative; width:242px; border-radius:6px 6px 8px 8px;
+    --paper:#FBF6E9; --rule:rgba(90,120,150,.22); --margin:rgba(200,70,60,.40);
+    --ink:#3A362E; --pencil:#8A8577; --redpen:#C0392B; --marker:rgba(255,214,79,.60); --accent:#C2410C;
+    background:var(--paper); color:var(--ink);
+    box-shadow:0 20px 45px rgba(40,34,20,.28), inset 0 0 40px rgba(120,90,40,.05); padding-top:16px;
+    transition:background .4s ease, color .4s ease;
+  }
+  .note.chalk{
+    --paper:#26302B; --rule:rgba(255,255,255,.12); --margin:rgba(226,122,107,.5);
+    --ink:#ECE7D6; --pencil:rgba(236,231,214,.55); --redpen:#E27A6B; --marker:rgba(240,220,120,.28); --accent:#E9B872;
+    box-shadow:0 20px 45px rgba(0,0,0,.5), inset 0 0 60px rgba(0,0,0,.25);
+  }
+  .binding{ position:absolute; top:5px; left:14px; right:14px; height:9px; display:flex; justify-content:space-between; z-index:3; }
+  .binding i{ width:7px; height:9px; border-radius:50%;
+    background:radial-gradient(circle at 50% 35%, rgba(0,0,0,.28), rgba(0,0,0,.08) 60%, transparent 70%);
+    box-shadow:inset 0 -1px 1px rgba(255,255,255,.4); }
+  .note.chalk .binding i{ background:radial-gradient(circle at 50% 35%, rgba(0,0,0,.5), transparent 70%); }
+  .bar{ display:flex; align-items:center; gap:8px; padding:2px 14px 0; color:var(--pencil); font-size:12px; }
+  .bar .pin{ color:var(--accent); } .bar .sp{ flex:1; } .bar .clock{ font-variant-numeric:tabular-nums; }
+  .timerzone{ text-align:center; padding:4px 14px 0; }
+  .big{ font-family:'Georgia',serif; font-size:46px; font-weight:400; letter-spacing:-1px; line-height:1; font-variant-numeric:tabular-nums; }
+  .uline{ position:relative; height:8px; margin:5px 34px 0; }
+  .uline::before{ content:''; position:absolute; left:0; right:0; top:3px; height:2px;
+    background:repeating-linear-gradient(90deg, var(--pencil) 0 3px, transparent 3px 5px); opacity:.5; }
+  .uline>i{ position:absolute; left:0; top:2px; height:3px; width:62%; background:var(--accent); border-radius:2px; }
+  .tally{ display:flex; align-items:center; justify-content:center; gap:9px; margin:9px 0 4px; font-size:10.5px; color:var(--pencil); }
+  .tally .marks{ display:flex; gap:4px; } .tally .marks i{ width:2.5px; height:15px; background:var(--pencil); opacity:.3; border-radius:2px; transform:rotate(-8deg); }
+  .tally .marks i.on{ opacity:.9; background:var(--ink); }
+  .paper{ position:relative; margin-top:6px; background:repeating-linear-gradient(transparent 0 29px, var(--rule) 29px 30px); background-position:0 6px; }
+  .paper::before{ content:''; position:absolute; left:30px; top:0; bottom:0; width:1.5px; background:var(--margin); }
+  .sect{ font-family:'Yomogi'; font-size:13px; padding:6px 0 4px 42px; position:relative; }
+  .sect::after{ content:''; position:absolute; left:42px; bottom:2px; width:52px; height:4px; background:var(--marker); border-radius:3px; opacity:.7; }
+  .list{ padding:0 14px 6px; }
+  .row{ display:flex; align-items:center; gap:9px; height:30px; padding-left:28px; position:relative; font-family:'Yomogi'; font-size:13px; color:var(--ink); }
+  .chk{ width:16px; height:16px; border:1.6px solid var(--pencil); border-radius:4px 5px 4px 6px; transform:rotate(-2deg); position:relative; cursor:pointer; flex:0 0 auto; }
+  .row.done .chk::after{ content:'✓'; position:absolute; left:1px; top:-5px; font-size:16px; color:var(--redpen); font-family:'Georgia'; transform:rotate(-6deg); }
+  .name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; position:relative; }
+  .row.run .name{ background:linear-gradient(var(--marker),var(--marker)); background-size:100% 62%; background-repeat:no-repeat; background-position:0 60%; padding:0 3px; border-radius:2px; }
+  .row.done .name{ color:var(--pencil); text-decoration:line-through; text-decoration-color:var(--redpen); text-decoration-thickness:1.5px; }
+  .t{ font-family:'Yomogi'; font-size:11px; color:var(--pencil); font-variant-numeric:tabular-nums; }
+  .row.run .t{ color:#8a6b1f; }
+  .row.parent .name{ font-size:14px; }
+  .tri{ position:absolute; left:7px; top:50%; transform:translateY(-50%); color:var(--pencil); cursor:pointer; font-size:9px; }
+  .group.collapsed .row.parent .tri{ transform:translateY(-50%) rotate(-90deg); }
+  .row.parent.carried .name::before{ content:'↪ '; color:var(--redpen); font-family:'Georgia'; }
+  .row.parent.anyrun:not(.done) .name{ background:linear-gradient(var(--marker),var(--marker)); background-size:100% 40%; background-repeat:no-repeat; background-position:0 82%; padding:0 3px; border-radius:2px; }
+  .agg{ font-family:'Yomogi'; font-size:10.5px; color:var(--pencil); white-space:nowrap; }
+  .agg .prog{ color:var(--accent); }
+  .children{ position:relative; margin-left:40px; overflow:hidden; max-height:220px; transition:max-height .35s ease; }
+  .group.collapsed .children{ max-height:0; }
+  .children::before{ content:''; position:absolute; left:0; top:-3px; bottom:15px; width:1.5px; background:var(--pencil); opacity:.45; }
+  .row.child{ padding-left:16px; } .row.child .name{ font-size:12px; }
+  .row.child::before{ content:''; position:absolute; left:0; top:50%; width:11px; height:1.5px; background:var(--pencil); opacity:.45; }
+  .toolbar{ display:flex; align-items:center; justify-content:center; gap:4px; height:44px; border-top:1px dashed rgba(0,0,0,.12); margin-top:4px; }
+  .toolbar .b{ width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--pencil); cursor:pointer; font-size:14px; }
+  .toolbar .b.primary{ color:var(--ink); } .toolbar .sep{ width:1px; height:16px; background:rgba(0,0,0,.12); margin:0 3px; }
+
+  /* ═══════════ クラシック（現行の円） ═══════════ */
+  .classic{
+    position:relative; width:210px; height:210px; border-radius:50%;
+    background:rgba(13,17,23,0.92); color:#E6EDF3;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), inset 0 -22px 46px rgba(0,0,0,.18), 0 20px 45px rgba(0,0,0,.4);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .classic::before{ content:''; position:absolute; inset:0; border-radius:50%;
+    background:radial-gradient(circle at 50% 26%, rgba(255,255,255,.05), transparent 58%); }
+  .classic svg.ring{ position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
+  .classic .rtrack{ fill:none; stroke:rgba(88,166,255,.15); stroke-width:2.5; }
+  .classic .rprog{ fill:none; stroke:#58A6FF; stroke-width:3; stroke-linecap:round; stroke-dasharray:596;
+    stroke-dashoffset:226; filter:drop-shadow(0 0 5px rgba(88,166,255,.5)); }
+  .classic .cclock{ font-size:14px; letter-spacing:2px; opacity:.55; font-variant-numeric:tabular-nums; }
+  .classic .cbig{ font-size:52px; font-weight:200; letter-spacing:-1px; font-variant-numeric:tabular-nums;
+    text-shadow:0 0 26px rgba(88,166,255,.3); line-height:1; margin-top:2px; }
+  .classic .cctrl{ position:absolute; bottom:34px; display:flex; gap:8px; opacity:.5; }
+  .classic .cctrl span{ width:8px; height:8px; border-radius:50%; background:#58A6FF; opacity:.4; }
+  .classic .cctrl span:nth-child(1){ opacity:.9; }
+  .classic-note{ text-align:center; font-size:10.5px; color:rgba(58,54,46,.5); margin-top:14px; }
+</style>
+</head>
+<body>
+
+  <div class="head">
+    <h1>デザインテンプレート切替</h1>
+    <p>データ（タスク・記録）は共通。見た目・形状・リストの有無だけがテンプレートで変わる。</p>
+  </div>
+
+  <div class="picker" id="picker">
+    <button data-tpl="note" class="on">📓 ノート</button>
+    <button data-tpl="chalk">🟩 黒板</button>
+    <button data-tpl="classic">⭕ クラシック</button>
+  </div>
+
+  <div class="stage">
+
+    <!-- ノート / 黒板 -->
+    <div class="tpl show" id="tpl-note">
+      <div class="note" id="noteWidget">
+        <div class="binding"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="bar"><span class="pin">📌</span><span class="date">7/21 (月)</span><span class="sp"></span><span class="clock" id="nclock">14:30</span></div>
+        <div class="timerzone">
+          <div class="big">24:12</div>
+          <div class="uline"><i></i></div>
+          <div class="tally"><span>セット</span><span class="marks"><i class="on"></i><i class="on"></i><i></i><i></i></span><span>2 / 4</span></div>
+        </div>
+        <div class="paper">
+          <div class="sect">やること</div>
+          <div class="list" id="nlist">
+            <div class="group">
+              <div class="row parent carried">
+                <span class="tri">▼</span><span class="chk"></span><span class="name">LP制作</span>
+                <span class="agg"><span class="prog">1/3</span> · <span class="js-sum">26:11</span></span>
+              </div>
+              <div class="children">
+                <div class="row child done"><span class="chk"></span><span class="name">要約をAIに依頼</span><span class="t js-run" data-sec="320" data-stop>05:20</span></div>
+                <div class="row child run"><span class="chk"></span><span class="name">文章を書く</span><span class="t js-run" data-sec="768">12:48</span></div>
+                <div class="row child run"><span class="chk"></span><span class="name">コード生成 (AI)</span><span class="t js-run" data-sec="483">08:03</span></div>
+              </div>
+            </div>
+            <div class="row"><span class="chk"></span><span class="name">メール返信</span><span class="t">—</span></div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="b primary">▶</div><div class="b">⏸</div><div class="b">⟳</div>
+          <div class="sep"></div><div class="b">☕</div><div class="b">🍅</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- クラシック（現行の円） -->
+    <div class="tpl" id="tpl-classic">
+      <div class="classic">
+        <svg class="ring" viewBox="0 0 210 210"><circle class="rtrack" cx="105" cy="105" r="95"/><circle class="rprog" cx="105" cy="105" r="95"/></svg>
+        <div class="cclock" id="cclock">14:30</div>
+        <div class="cbig">24:12</div>
+        <div class="cctrl"><span></span><span></span><span></span></div>
+      </div>
+      <div class="classic-note">現在のミニマルデザイン（円・タイマーのみ）。<br>タスクリストは非表示＝最小構成で集中。</div>
+    </div>
+
+  </div>
+
+  <div class="foot">上のセグメントでテンプレートを切替（ノート／黒板／クラシック）<br>ノート・黒板ではチェック・持ち越し・親子リストがそのまま使えます</div>
+
+<script>
+  // ── テンプレート切替 ──
+  const picker=document.getElementById('picker');
+  const noteWidget=document.getElementById('noteWidget');
+  const tplNote=document.getElementById('tpl-note');
+  const tplClassic=document.getElementById('tpl-classic');
+  picker.addEventListener('click',e=>{
+    const btn=e.target.closest('button'); if(!btn) return;
+    [...picker.children].forEach(b=>b.classList.toggle('on', b===btn));
+    const tpl=btn.dataset.tpl;
+    if(tpl==='classic'){ tplNote.classList.remove('show'); tplClassic.classList.add('show'); }
+    else { tplClassic.classList.remove('show'); tplNote.classList.add('show');
+           noteWidget.classList.toggle('chalk', tpl==='chalk'); }
+  });
+
+  // ── ノートのインタラクション ──
+  const nlist=document.getElementById('nlist');
+  function fmt(s){ const m=Math.floor(s/60); return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+  function parseT(t){ const m=/^(\d+):(\d+)$/.exec((t||'').trim()); return m?(+m[1]*60+ +m[2]):0; }
+  function updateGroups(){
+    nlist.querySelectorAll('.group').forEach(g=>{
+      const kids=[...g.querySelectorAll('.row.child')]; const total=kids.length;
+      const done=kids.filter(k=>k.classList.contains('done')).length;
+      let sum=0; kids.forEach(k=>sum+=parseT(k.querySelector('.t')?.textContent));
+      const p=g.querySelector('.row.parent');
+      p.querySelector('.prog').textContent=done+'/'+total;
+      p.querySelector('.js-sum').textContent=fmt(sum);
+      p.classList.toggle('done', total>0&&done===total);
+      p.classList.toggle('anyrun', kids.some(k=>k.classList.contains('run')));
+    });
+  }
+  function bindLeaf(chk){ chk.addEventListener('click',e=>{ e.stopPropagation();
+    chk.closest('.row').classList.toggle('done'); updateGroups(); }); }
+  nlist.querySelectorAll('.row.child > .chk, .list > .row:not(.parent) > .chk').forEach(bindLeaf);
+  nlist.querySelectorAll('.row.parent').forEach(p=>{
+    p.querySelector('.chk').addEventListener('click',e=>{ e.stopPropagation();
+      const kids=[...p.closest('.group').querySelectorAll('.row.child')];
+      const all=kids.every(k=>k.classList.contains('done'));
+      kids.forEach(k=>k.classList.toggle('done',!all)); updateGroups(); });
+    p.querySelector('.tri').addEventListener('click',e=>{ e.stopPropagation();
+      p.closest('.group').classList.toggle('collapsed'); });
+  });
+  const timers=[...document.querySelectorAll('.js-run')].map(el=>({el,sec:+el.dataset.sec||0,stop:el.hasAttribute('data-stop')}));
+  setInterval(()=>{ for(const t of timers){ if(!t.stop) t.sec++; t.el.textContent=fmt(t.sec); } updateGroups(); },1000);
+  updateGroups();
+  setInterval(()=>{ const now=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('nclock').textContent=now; document.getElementById('cclock').textContent=now; },15000);
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import { initStorage, storageGet, storageGetFresh, storageSet, flushStorage, getDataFilePath, setDataFilePath } from './store.js';
 import { initWater, resetWater, ensureLoop as waterEnsureLoop } from './water.js';
 import * as timelapse from './timelapse.js';
+import * as tasks from './tasks.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const CIRCUMFERENCE = 2 * Math.PI * 126;
@@ -90,6 +91,26 @@ const taskNameEl = document.getElementById('task-name');
 const iconPlay = document.getElementById('icon-play');
 const iconPause = document.getElementById('icon-pause');
 
+// ── Note / Chalk template refs ───────────────────────────────────────────────
+const noteTpl = document.getElementById('note-tpl');
+const noteTimer = document.getElementById('note-timer');
+const noteTimerInput = document.getElementById('note-timer-input');
+const noteClock = document.getElementById('note-clock');
+const noteDate = document.getElementById('note-date');
+const noteProgress = document.getElementById('note-progress');
+const noteTally = document.getElementById('note-tally');
+const noteChev = document.getElementById('note-chev');
+const noteList = document.getElementById('note-list');
+const noteAddInput = document.getElementById('note-add-input');
+const notePin = document.getElementById('note-pin');
+const notePlayBtn = document.getElementById('note-play');
+const notePauseBtn = document.getElementById('note-pause');
+
+// テンプレート状態（'note' | 'chalk' | 'classic'）
+let template = 'note';
+let noteCollapsed = false;
+const NOTE_W = 264, NOTE_H_OPEN = 470, NOTE_H_COLLAPSED = 196;
+
 // ── Water animation ────────────────────────────────────────────────────────
 initWater(
   document.getElementById('water-canvas'),
@@ -110,6 +131,10 @@ function draw() {
     ratio = (st.elapsed % 3600) / 3600;
   }
   ringEl.style.strokeDashoffset = CIRCUMFERENCE * (1 - ratio);
+  if (noteProgress) {
+    const fill = st.mode === 'countdown' ? Math.min(1, st.elapsed / st.total) : ratio;
+    noteProgress.style.width = (fill * 100) + '%';
+  }
   if (st.mode === 'countdown' && !st.breakMode && st.elapsed > 0.01) {
     waterEnsureLoop();
   } else if (st.elapsed <= 0.01) {
@@ -119,21 +144,24 @@ function draw() {
 
 // ── Text refresh ───────────────────────────────────────────────────────────
 function refreshText() {
+  let timeStr;
   if (st.mode === 'countdown') {
     const rem = Math.max(0, st.total - st.elapsed);
     const m = Math.floor(rem / 60);
     const s = Math.floor(rem % 60);
-    timerEl.textContent = `${pad(m)}:${pad(s)}`;
+    timeStr = `${pad(m)}:${pad(s)}`;
   } else {
     const total = Math.floor(st.elapsed);
     const s = total % 60;
     const m = Math.floor(total / 60) % 60;
     const h = Math.floor(total / 3600);
-    timerEl.textContent = h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    timeStr = h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
   }
-  clockEl.textContent = new Date().toLocaleTimeString('ja-JP', {
-    hour: '2-digit', minute: '2-digit',
-  });
+  timerEl.textContent = timeStr;
+  if (noteTimer && !completionActive) noteTimer.textContent = timeStr;
+  const clockStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  clockEl.textContent = clockStr;
+  if (noteClock) noteClock.textContent = clockStr;
 }
 
 const pad = n => String(n).padStart(2, '0');
@@ -199,6 +227,28 @@ function setPlayIcon(playing) {
   iconPlay.style.display = playing ? 'none' : '';
   iconStop.style.display = playing ? '' : 'none';
   btnPause.style.display = playing ? '' : 'none';
+  if (notePlayBtn) notePlayBtn.textContent = playing ? '■' : '▶';
+  if (notePauseBtn) notePauseBtn.style.display = playing ? '' : 'none';
+  syncNoteButtons();
+}
+
+// ノートのトグルボタン状態（休憩/ポモ/ピン）を円側の状態に同期
+function syncNoteButtons() {
+  document.getElementById('note-break')?.classList.toggle('active', st.breakMode);
+  document.getElementById('note-pomo')?.classList.toggle('active', pomo.active);
+  notePin?.classList.toggle('pinned', st.pinned);
+}
+
+// ノートのタリー（ポモドーロのセット進捗）を描画
+function renderNoteTally() {
+  if (!noteTally) return;
+  if (pomo.active) {
+    let marks = '';
+    for (let i = 1; i <= pomo.totalSets; i++) marks += `<i class="${i <= pomo.currentSet ? 'on' : ''}"></i>`;
+    noteTally.innerHTML = `<span>セット</span><span class="marks">${marks}</span><span>${pomo.currentSet} / ${pomo.totalSets}</span>`;
+  } else {
+    noteTally.innerHTML = '';
+  }
 }
 
 // ── Completion notification ─────────────────────────────────────────────────
@@ -210,19 +260,26 @@ function updateCompletionDisplay() {
   const elapsed = Math.floor((Date.now() - completionStartTime) / 1000);
   const m = Math.floor(elapsed / 60);
   const s = elapsed % 60;
-  timerEl.textContent = `+${pad(m)}:${pad(s)}`;
+  const str = `+${pad(m)}:${pad(s)}`;
+  timerEl.textContent = str;
+  if (noteTimer) noteTimer.textContent = str;
 }
 
 async function startCompletion() {
   if (completionActive) return;
+  // 1 セット終了 → 未完了の作業を次セットへ持ち越し、完了はアーカイブ
+  tasks.carryOverNewSet();
+  renderNoteTally();
   completionActive = true;
   completionStartTime = Date.now();
   updateCompletionDisplay();
   completionIntervalId = setInterval(updateCompletionDisplay, 1000);
-  // 通知時は zoom をリセット（Rust 側が 400px に拡大するため）
-  circle.style.zoom = '';
-  document.documentElement.classList.add('completion');
-  await window.__TAURI__?.core?.invoke?.('notify_completion');
+  // 円テンプレートのみウィンドウを拡大する演出（縦長では行わない）
+  if (template === 'classic') {
+    circle.style.zoom = '';
+    document.documentElement.classList.add('completion');
+    await window.__TAURI__?.core?.invoke?.('notify_completion');
+  }
 }
 
 async function dismissCompletion() {
@@ -240,16 +297,18 @@ async function dismissCompletion() {
   st.sessionStart = null;
 
   document.documentElement.classList.remove('completion');
-  await window.__TAURI__?.core?.invoke?.('dismiss_completion');
-  // カスタムサイズを復元
-  const scale = currentWindowSize / 280;
-  document.documentElement.style.width = currentWindowSize + 'px';
-  document.documentElement.style.height = currentWindowSize + 'px';
-  document.body.style.width = currentWindowSize + 'px';
-  document.body.style.height = currentWindowSize + 'px';
-  circle.style.zoom = scale;
-  // ピン留め状態を復元
-  await tauriWin()?.setAlwaysOnTop(st.pinned);
+  if (template === 'classic') {
+    await window.__TAURI__?.core?.invoke?.('dismiss_completion');
+    // カスタムサイズを復元
+    const scale = currentWindowSize / 280;
+    document.documentElement.style.width = currentWindowSize + 'px';
+    document.documentElement.style.height = currentWindowSize + 'px';
+    document.body.style.width = currentWindowSize + 'px';
+    document.body.style.height = currentWindowSize + 'px';
+    circle.style.zoom = scale;
+    // ピン留め状態を復元
+    await tauriWin()?.setAlwaysOnTop(st.pinned);
+  }
   // タイマー表示を元に戻す
   refreshText();
   draw();
@@ -257,6 +316,8 @@ async function dismissCompletion() {
 
 // ── Pomodoro ────────────────────────────────────────────────────────────────
 function renderPomoStatus() {
+  renderNoteTally();
+  syncNoteButtons();
   if (!pomo.active) {
     pomoStatusEl.classList.remove('active');
     return;
@@ -315,6 +376,8 @@ async function openPomoWindow() {
 // ── Break mode ─────────────────────────────────────────────────────────────
 function enterBreak() {
   if (st.breakMode) return;
+  // 休憩に入る時は進行中の作業計測を止める（記録は確定）
+  tasks.flushAllRunning();
   // 一時停止中でも、開始済みの作業時間があれば休憩前に記録する
   if (st.sessionStart !== null && st.elapsed >= 5) logSession();
   // 現在のタスクとタイマー設定を退避
@@ -337,6 +400,7 @@ function enterBreak() {
   draw();
   circle.classList.add('break-mode');
   btnBreak.classList.add('active');
+  syncNoteButtons();
 }
 
 function exitBreak() {
@@ -348,6 +412,7 @@ function exitBreak() {
   renderTaskName();
   circle.classList.remove('break-mode');
   btnBreak.classList.remove('active');
+  syncNoteButtons();
 }
 
 btnBreak.addEventListener('click', () => {
@@ -436,6 +501,7 @@ btnReset.addEventListener('click', () => {
   dismissCompletion();
   exitBreak();
   exitPomo();
+  tasks.flushAllRunning();
   if (st.running) logSession();
   st.running = false;
   st.elapsed = 0;
@@ -508,6 +574,11 @@ ctxMenu.addEventListener('mousedown', (e) => e.stopPropagation());
 ctxOpenDevtools.addEventListener('click', async () => {
   closeCtxMenu();
   await window.__TAURI__?.core?.invoke?.('open_records_devtools');
+});
+
+document.getElementById('ctx-template')?.addEventListener('click', () => {
+  closeCtxMenu();
+  cycleTemplate();
 });
 
 // ── Excel / Google Sheets integration setup panel ──────────────────
@@ -970,6 +1041,7 @@ timerInputEl.addEventListener('blur', () => closeEdit(true));
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   if (timerInputEl.style.display === 'block') return;
+  if (noteTimerInput.style.display === 'block') return;
   e.preventDefault();
   if (completionActive) { dismissCompletion(); return; }
   if (st.running) {
@@ -1119,6 +1191,122 @@ circle.addEventListener('wheel', (e) => {
   draw();
 }, { passive: false });
 
+// ── Design template (note / chalk / classic) ───────────────────────────────
+async function applyTemplate(tpl) {
+  template = (tpl === 'classic' || tpl === 'chalk') ? tpl : 'note';
+  document.documentElement.dataset.template = template;
+  storageSet('mt_template', template);
+  if (template === 'classic') {
+    // 円テンプレート: 従来どおり正方形サイズ
+    await applyWindowSize(currentWindowSize);
+  } else {
+    // ノート/黒板: 縦長長方形
+    noteTpl.classList.toggle('collapsed', noteCollapsed);
+    const h = noteCollapsed ? NOTE_H_COLLAPSED : NOTE_H_OPEN;
+    circle.style.zoom = '';
+    document.documentElement.style.width = NOTE_W + 'px';
+    document.documentElement.style.height = h + 'px';
+    document.body.style.width = NOTE_W + 'px';
+    document.body.style.height = h + 'px';
+    await window.__TAURI__?.core?.invoke?.('resize_window_rect', { width: NOTE_W, height: h });
+  }
+  refreshText();
+  draw();
+  syncNoteButtons();
+}
+
+function cycleTemplate() {
+  const order = ['note', 'chalk', 'classic'];
+  applyTemplate(order[(order.indexOf(template) + 1) % order.length]);
+}
+
+async function toggleNoteCollapse() {
+  noteCollapsed = !noteCollapsed;
+  noteTpl.classList.toggle('collapsed', noteCollapsed);
+  const h = noteCollapsed ? NOTE_H_COLLAPSED : NOTE_H_OPEN;
+  document.documentElement.style.height = h + 'px';
+  document.body.style.height = h + 'px';
+  await window.__TAURI__?.core?.invoke?.('resize_window_rect', { width: NOTE_W, height: h });
+}
+
+// ノートのタイマー編集（円の openEdit/closeEdit と同じ挙動）
+function openNoteEdit() {
+  const m = Math.floor(st.total / 60);
+  const s = st.total % 60;
+  noteTimerInput.value = s === 0 ? String(m) : `${pad(m)}:${pad(s)}`;
+  noteTimer.style.display = 'none';
+  noteTimerInput.style.display = 'block';
+  noteTimerInput.focus();
+  noteTimerInput.select();
+}
+function closeNoteEdit(commit) {
+  if (commit) {
+    const parsed = parseTimeInput(noteTimerInput.value);
+    if (parsed !== null) { st.total = parsed; st.elapsed = 0; lastSecond = -1; }
+  }
+  noteTimerInput.style.display = 'none';
+  noteTimer.style.display = '';
+  refreshText();
+  draw();
+}
+
+// 進行中タスクの計測区間を記録（mt_logs へ。records / Excel / Sheets 連携もそのまま流れる）
+function logTaskSpan(span) {
+  const duration = Math.floor(span.duration);
+  if (duration < 5) return;
+  const session = {
+    id: Math.random().toString(36).slice(2),
+    task: span.text || '(タスクなし)',
+    detail: null,
+    duration,
+    startedAt: span.startedAt,
+    endedAt: span.endedAt,
+    mode: 'countup',
+    isBreak: false,
+  };
+  logs = storageGetFresh('mt_logs', []);
+  logs.push(session);
+  storageSet('mt_logs', logs);
+  syncSessionIntegrations(session);
+}
+
+// ── Note template event wiring ──────────────────────────────────────────────
+notePin?.addEventListener('click', (e) => { e.stopPropagation(); btnPin.click(); syncNoteButtons(); });
+noteChev?.addEventListener('click', (e) => { e.stopPropagation(); toggleNoteCollapse(); });
+notePlayBtn?.addEventListener('click', (e) => { e.stopPropagation(); btnPlay.click(); });
+notePauseBtn?.addEventListener('click', (e) => { e.stopPropagation(); btnPause.click(); });
+document.getElementById('note-reset')?.addEventListener('click', (e) => { e.stopPropagation(); btnReset.click(); });
+document.getElementById('note-break')?.addEventListener('click', (e) => { e.stopPropagation(); btnBreak.click(); });
+document.getElementById('note-pomo')?.addEventListener('click', (e) => { e.stopPropagation(); btnPomo.click(); });
+document.getElementById('note-template-btn')?.addEventListener('click', (e) => { e.stopPropagation(); cycleTemplate(); });
+
+noteTimer?.addEventListener('click', () => {
+  if (completionActive) { dismissCompletion(); return; }
+  if (st.running || st.mode !== 'countdown') return;
+  openNoteEdit();
+});
+// 完了通知中はノートのどこをクリックしても解除
+noteTpl?.addEventListener('click', () => {
+  if (completionActive) dismissCompletion();
+});
+noteTimerInput?.addEventListener('mousedown', (e) => e.stopPropagation());
+noteTimerInput?.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { e.preventDefault(); closeNoteEdit(true); }
+  if (e.key === 'Escape') closeNoteEdit(false);
+});
+noteTimerInput?.addEventListener('blur', () => closeNoteEdit(true));
+
+// ノート上のスクロールでカウントダウン時間を調整（停止中のみ）
+noteTpl?.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (e.ctrlKey || st.running || st.mode !== 'countdown') return;
+  const delta = e.deltaY > 0 ? 60 : -60;
+  st.total = Math.max(60, Math.min(28800, st.total + delta));
+  refreshText();
+  draw();
+}, { passive: false });
+
 // ── Init ───────────────────────────────────────────────────────────────────
 (async () => {
   // main ウィンドウのみ同期ファイルとの取り込み・書き出しを行う
@@ -1146,9 +1334,16 @@ circle.addEventListener('wheel', (e) => {
 
   currentWindowSize = storageGet('mt_window_size', 280);
 
+  // 進行中タスク（作業リスト）を初期化
+  noteDate.textContent = new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+  tasks.initTasks({ container: noteList, addInput: noteAddInput, log: logTaskSpan });
+  renderNoteTally();
+
   refreshText();
   renderTaskName();
-  if (currentWindowSize !== 280) applyWindowSize(currentWindowSize);
+  // デザインテンプレートを適用（形状・ウィンドウサイズを含む）
+  template = storageGet('mt_template', 'note');
+  await applyTemplate(template);
   // 前回のウィンドウ位置を復元
   const savedPos = storageGet('mt_window_pos', null);
   if (savedPos) {
@@ -1157,6 +1352,7 @@ circle.addEventListener('wheel', (e) => {
   // デフォルトで前面固定
   btnPin.classList.add('pinned');
   await tauriWin()?.setAlwaysOnTop(true);
+  syncNoteButtons();
 
   // 停止状態で起動するため rAF は使わず、時計のみ定期更新
   clockTickInterval = setInterval(() => {
@@ -1168,6 +1364,14 @@ circle.addEventListener('wheel', (e) => {
 // 円の外（透明コーナー部分）ではクリックを背後のウィンドウに通す
 let _cursorPassthrough = false;
 document.addEventListener('mousemove', (e) => {
+  // 円テンプレートのみ透明コーナーの透過処理を行う（ノートは矩形で全面が有効）
+  if (template !== 'classic') {
+    if (_cursorPassthrough) {
+      _cursorPassthrough = false;
+      window.__TAURI__?.core?.invoke?.('set_cursor_passthrough', { ignore: false });
+    }
+    return;
+  }
   const rect = circle.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;

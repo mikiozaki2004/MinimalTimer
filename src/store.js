@@ -8,6 +8,7 @@ const _cache = {};
 const SYNC_KEYS = [
   'mt_theme', 'mt_tasks', 'mt_current_task', 'mt_current_detail',
   'mt_logs', 'mt_sheets_url', 'mt_excel_path',
+  'mt_template', 'mt_active_items', 'mt_active_set',
 ];
 // このPC固有のキー（ウィンドウ位置・カメラ設定など）
 const LOCAL_KEYS = [

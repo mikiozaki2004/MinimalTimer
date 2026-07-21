@@ -243,7 +243,8 @@ fn set_cursor_passthrough(app: tauri::AppHandle, ignore: bool) {
 // ── Completion notification ────────────────────────────────────────
 
 static SAVED_POS: Mutex<Option<(f64, f64)>> = Mutex::new(None);
-static CURRENT_SIZE: Mutex<f64> = Mutex::new(280.0);
+// メインウィンドウの現在サイズ (width, height)。テンプレートにより正方形/縦長を切替える
+static CURRENT_SIZE: Mutex<(f64, f64)> = Mutex::new((280.0, 280.0));
 const COMPLETION_SIZE: f64 = 400.0;
 
 #[tauri::command]
@@ -288,8 +289,8 @@ fn set_window_position(app: tauri::AppHandle, x: f64, y: f64) {
         let my = m.position().y as f64 / s;
         let mw = m.size().width as f64 / s;
         let mh = m.size().height as f64 / s;
-        let size = *CURRENT_SIZE.lock().unwrap();
-        (mx + (mw - size) / 2.0, my + (mh - size) / 2.0)
+        let (sw, sh) = *CURRENT_SIZE.lock().unwrap();
+        (mx + (mw - sw) / 2.0, my + (mh - sh) / 2.0)
     } else {
         (x, y)
     };
@@ -301,8 +302,16 @@ fn set_window_position(app: tauri::AppHandle, x: f64, y: f64) {
 fn resize_window(app: tauri::AppHandle, size: u32) {
     let Some(win) = app.get_webview_window("main") else { return };
     let size_f = size as f64;
-    *CURRENT_SIZE.lock().unwrap() = size_f;
+    *CURRENT_SIZE.lock().unwrap() = (size_f, size_f);
     let _ = win.set_size(tauri::LogicalSize::new(size_f, size_f));
+}
+
+/// 縦長長方形テンプレート用: 幅・高さを個別に指定してメインウィンドウをリサイズ
+#[tauri::command]
+fn resize_window_rect(app: tauri::AppHandle, width: f64, height: f64) {
+    let Some(win) = app.get_webview_window("main") else { return };
+    *CURRENT_SIZE.lock().unwrap() = (width, height);
+    let _ = win.set_size(tauri::LogicalSize::new(width, height));
 }
 
 #[tauri::command]
@@ -341,8 +350,8 @@ fn dismiss_completion(app: tauri::AppHandle) {
     let Some(win) = app.get_webview_window("main") else { return };
 
     // 元のサイズに戻す
-    let current = *CURRENT_SIZE.lock().unwrap();
-    let _ = win.set_size(tauri::LogicalSize::new(current, current));
+    let (cw, ch) = *CURRENT_SIZE.lock().unwrap();
+    let _ = win.set_size(tauri::LogicalSize::new(cw, ch));
 
     // 元の位置に戻す
     if let Some((x, y)) = SAVED_POS.lock().unwrap().take() {
@@ -804,6 +813,7 @@ pub fn run() {
             notify_completion,
             dismiss_completion,
             resize_window,
+            resize_window_rect,
             get_window_position,
             set_window_position,
             append_excel_records,

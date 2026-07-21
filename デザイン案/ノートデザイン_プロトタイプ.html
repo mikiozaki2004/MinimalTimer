@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MinimalTimer — ノートデザイン プロトタイプ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{
+    font-family:'Zen Kurenaido','Segoe UI',sans-serif; color:#3A362E;
+    background:
+      radial-gradient(900px 500px at 15% -10%, #e7ddc8 0%, transparent 55%),
+      linear-gradient(160deg,#d9d2c2 0%,#cfc8b6 100%);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:20px; padding:40px;
+  }
+  .head{ text-align:center; }
+  .head h1{ font-size:19px; font-weight:600; font-family:'Yomogi',cursive; }
+  .head p{ font-size:12px; color:rgba(58,54,46,.6); margin-top:6px; }
+
+  /* ── ノート本体 ─────────────────────────── */
+  .note{
+    position:relative; width:242px; border-radius:6px 6px 8px 8px;
+    --paper:#FBF6E9; --rule:rgba(90,120,150,.22); --margin:rgba(200,70,60,.40);
+    --ink:#3A362E; --pencil:#8A8577; --redpen:#C0392B;
+    --marker:rgba(255,214,79,.60); --accent:#C2410C;
+    background:var(--paper); color:var(--ink);
+    box-shadow:0 20px 45px rgba(40,34,20,.28), inset 0 0 40px rgba(120,90,40,.05);
+    padding-top:16px;
+    transition:background .4s ease, color .4s ease;
+  }
+  /* リング綴じ */
+  .binding{ position:absolute; top:5px; left:14px; right:14px; height:9px; display:flex;
+    justify-content:space-between; z-index:3; }
+  .binding i{ width:7px; height:9px; border-radius:50%;
+    background:radial-gradient(circle at 50% 35%, rgba(0,0,0,.28), rgba(0,0,0,.08) 60%, transparent 70%);
+    box-shadow:inset 0 -1px 1px rgba(255,255,255,.4); }
+
+  .bar{ display:flex; align-items:center; gap:8px; padding:2px 14px 0; color:var(--pencil); font-size:12px; }
+  .bar .pin{ color:var(--accent); cursor:pointer; }
+  .bar .date{ font-family:'Zen Kurenaido'; letter-spacing:.5px; }
+  .bar .sp{ flex:1; }
+  .bar .clock{ font-variant-numeric:tabular-nums; }
+  .chev{ cursor:pointer; width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+    border-radius:6px; transition:transform .38s cubic-bezier(.4,0,.2,1), background .15s; color:var(--pencil); }
+  .chev:hover{ background:rgba(0,0,0,.05); }
+  .note.open .chev{ transform:rotate(180deg); }
+  .chev svg{ width:13px; height:13px; }
+
+  .timerzone{ text-align:center; padding:4px 14px 0; cursor:pointer; }
+  .big{ font-family:'Georgia',serif; font-size:46px; font-weight:400; letter-spacing:-1px;
+    line-height:1; font-variant-numeric:tabular-nums; }
+  /* 手描き風アンダーライン＝進捗 */
+  .uline{ position:relative; height:8px; margin:5px 34px 0; }
+  .uline::before{ content:''; position:absolute; left:0; right:0; top:3px; height:2px;
+    background:repeating-linear-gradient(90deg, var(--pencil) 0 3px, transparent 3px 5px); opacity:.5; }
+  .uline>i{ position:absolute; left:0; top:2px; height:3px; width:62%; background:var(--accent);
+    border-radius:2px; box-shadow:0 1px 0 rgba(0,0,0,.05); }
+
+  /* タリー（セット） */
+  .tally{ display:flex; align-items:center; justify-content:center; gap:9px; margin-top:9px;
+    font-size:10.5px; color:var(--pencil); }
+  .tally .marks{ display:flex; gap:4px; }
+  .tally .marks i{ width:2.5px; height:15px; background:var(--pencil); opacity:.3; border-radius:2px;
+    transform:rotate(-8deg); }
+  .tally .marks i.on{ opacity:.9; background:var(--ink); }
+
+  /* 折りたたみサマリー */
+  .summary{ display:flex; gap:7px; justify-content:center; padding:12px 0 4px; overflow:hidden;
+    max-height:50px; opacity:1; transition:max-height .38s cubic-bezier(.4,0,.2,1), opacity .22s, padding .38s; }
+  .note.open .summary{ max-height:0; opacity:0; padding:0; }
+  .summary .pill{ font-size:10.5px; padding:3px 10px; border-radius:20px; font-family:'Yomogi'; }
+  .summary .pill.run{ color:#7a5c00; background:var(--marker); }
+  .summary .pill.carry{ color:var(--redpen); border:1px solid rgba(192,57,43,.4); }
+
+  /* 展開領域 */
+  .expand{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .4s cubic-bezier(.4,0,.2,1); }
+  .note.open .expand{ grid-template-rows:1fr; }
+  .expand-inner{ overflow:hidden; }
+
+  /* 罫線＋マージンの紙面 */
+  .paper{ position:relative; margin-top:8px;
+    background:
+      repeating-linear-gradient(transparent 0 29px, var(--rule) 29px 30px);
+    background-position:0 6px; }
+  .paper::before{ content:''; position:absolute; left:30px; top:0; bottom:0; width:1.5px;
+    background:var(--margin); }
+  .sect{ font-family:'Yomogi'; font-size:13px; color:var(--ink); padding:6px 0 4px 42px; position:relative; }
+  .sect::after{ content:''; position:absolute; left:42px; bottom:2px; width:52px; height:4px;
+    background:var(--marker); border-radius:3px; z-index:-0; opacity:.7; }
+
+  .list{ padding:0 14px 6px; }
+  .row{ display:flex; align-items:center; gap:9px; height:30px; padding-left:28px; position:relative;
+    font-family:'Yomogi'; font-size:13px; color:var(--ink); }
+  /* 継続マーク（マージン内） */
+  .row .carry{ position:absolute; left:9px; color:var(--redpen); font-size:13px; font-family:'Georgia';
+    display:none; }
+  .row.carried .carry{ display:block; }
+
+  .chk{ width:16px; height:16px; border:1.6px solid var(--pencil); border-radius:4px 5px 4px 6px;
+    transform:rotate(-2deg); position:relative; cursor:pointer; flex:0 0 auto; background:transparent; }
+  .row.done .chk::after{ content:'✓'; position:absolute; left:1px; top:-5px; font-size:16px;
+    color:var(--redpen); font-family:'Georgia'; transform:rotate(-6deg); }
+  .name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; position:relative; }
+  /* 走行中＝蛍光マーカー */
+  .row.run .name{ background:linear-gradient(var(--marker),var(--marker)); background-size:100% 62%;
+    background-repeat:no-repeat; background-position:0 60%; padding:0 3px; border-radius:2px;
+    animation:breathe 3s ease-in-out infinite; }
+  @keyframes breathe{ 0%,100%{filter:saturate(1) brightness(1)} 50%{filter:saturate(1.15) brightness(1.03)} }
+  .row.done .name{ color:var(--pencil); text-decoration:line-through; text-decoration-color:var(--redpen);
+    text-decoration-thickness:1.5px; }
+  .t{ font-family:'Yomogi'; font-size:11px; color:var(--pencil); font-variant-numeric:tabular-nums; }
+  .row.run .t{ color:#8a6b1f; }
+
+  /* ── 親子（グループ） ── */
+  .row.parent .name{ font-size:14px; }
+  .tri{ position:absolute; left:7px; top:50%; transform:translateY(-50%);
+    color:var(--pencil); cursor:pointer; font-size:9px; user-select:none; transition:transform .2s; }
+  .group.collapsed .row.parent .tri{ transform:translateY(-50%) rotate(-90deg); }
+  .row.parent.carried .name::before{ content:'↪ '; color:var(--redpen); font-family:'Georgia'; }
+  .row.parent.anyrun:not(.done) .name{ background:linear-gradient(var(--marker),var(--marker));
+    background-size:100% 40%; background-repeat:no-repeat; background-position:0 82%; padding:0 3px; border-radius:2px; }
+  .agg{ font-family:'Yomogi'; font-size:10.5px; color:var(--pencil); white-space:nowrap; flex:0 0 auto; }
+  .agg .prog{ color:var(--accent); }
+  .children{ position:relative; margin-left:40px; overflow:hidden; max-height:220px;
+    transition:max-height .35s ease; }
+  .group.collapsed .children{ max-height:0; }
+  .children::before{ content:''; position:absolute; left:0; top:-3px; bottom:15px; width:1.5px;
+    background:var(--pencil); opacity:.45; }
+  .row.child{ padding-left:16px; }
+  .row.child::before{ content:''; position:absolute; left:0; top:50%; width:11px; height:1.5px;
+    background:var(--pencil); opacity:.45; }
+  .row.child .name{ font-size:12px; }
+
+  .add{ display:flex; align-items:center; gap:9px; height:30px; padding-left:44px; font-family:'Yomogi';
+    font-size:12.5px; color:var(--pencil); cursor:text; }
+  .add .plus{ color:var(--accent); }
+  .add input{ flex:1; border:none; background:none; outline:none; font-family:'Yomogi'; font-size:12.5px;
+    color:var(--ink); }
+  .add input::placeholder{ color:var(--pencil); opacity:.7; }
+
+  .toolbar{ display:flex; align-items:center; justify-content:center; gap:4px; height:44px;
+    border-top:1px dashed rgba(0,0,0,.12); margin-top:4px; }
+  .toolbar .b{ width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:var(--pencil); cursor:pointer; font-size:14px; transition:.15s; }
+  .toolbar .b:hover{ color:var(--accent); background:rgba(0,0,0,.05); }
+  .toolbar .b.primary{ color:var(--ink); }
+  .toolbar .sep{ width:1px; height:16px; background:rgba(0,0,0,.12); margin:0 3px; }
+
+  .foot{ font-size:11px; color:rgba(58,54,46,.5); font-family:'Zen Kurenaido'; text-align:center; line-height:1.7; }
+  .foot b{ color:#8a6b1f; } .foot i{ color:#C0392B; font-style:normal; }
+
+  /* ── 黒板（ダーク）版 ── */
+  .note.chalk{
+    --paper:#26302B; --rule:rgba(255,255,255,.12); --margin:rgba(226,122,107,.5);
+    --ink:#ECE7D6; --pencil:rgba(236,231,214,.55); --redpen:#E27A6B;
+    --marker:rgba(240,220,120,.28); --accent:#E9B872;
+    box-shadow:0 20px 45px rgba(0,0,0,.5), inset 0 0 60px rgba(0,0,0,.25);
+  }
+  .note.chalk .binding i{ background:radial-gradient(circle at 50% 35%, rgba(0,0,0,.5), transparent 70%); }
+</style>
+</head>
+<body>
+
+  <div class="head">
+    <h1>ノートデザイン — プロトタイプ</h1>
+    <p>走行=<b style="background:rgba(255,214,79,.5);padding:0 4px;border-radius:3px">蛍光マーカー</b> ・ 完了=<i>赤ペンで見せ消し</i> ・ <i>↪</i>=前セットから持ち越し</p>
+  </div>
+
+  <div class="note open" id="note">
+    <div class="binding"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+    <div class="bar">
+      <span class="pin" title="最前面固定">📌</span>
+      <span class="date">7/21 (月)</span>
+      <span class="sp"></span>
+      <span class="clock" id="clock">14:30</span>
+      <span class="chev" id="chev" title="開閉">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+    </div>
+
+    <div class="timerzone" id="timerzone">
+      <div class="big">24:12</div>
+      <div class="uline"><i></i></div>
+      <div class="tally"><span>セット</span><span class="marks"><i class="on"></i><i class="on"></i><i></i><i></i></span><span>2 / 4</span></div>
+    </div>
+
+    <div class="summary">
+      <span class="pill run">✍ 2 実行中</span>
+      <span class="pill carry">↪ 2 持ち越し</span>
+    </div>
+
+    <div class="expand">
+      <div class="expand-inner">
+        <div class="paper">
+          <div class="sect">やること</div>
+          <div class="list" id="list">
+            <div class="group">
+              <div class="row parent carried">
+                <span class="tri">▼</span>
+                <span class="chk"></span>
+                <span class="name">LP制作</span>
+                <span class="agg"><span class="prog">1/3</span> · <span class="js-sum">26:11</span></span>
+              </div>
+              <div class="children">
+                <div class="row child done"><span class="chk"></span><span class="name">要約をAIに依頼</span><span class="t js-run" data-sec="320" data-stop>05:20</span></div>
+                <div class="row child run"><span class="chk"></span><span class="name">文章を書く</span><span class="t js-run" data-sec="768">12:48</span></div>
+                <div class="row child run"><span class="chk"></span><span class="name">コード生成 (AI)</span><span class="t js-run" data-sec="483">08:03</span></div>
+              </div>
+            </div>
+            <div class="row"><span class="chk"></span><span class="name">メール返信</span><span class="t">—</span></div>
+          </div>
+          <div class="add" id="addRow">
+            <span class="plus">＋</span>
+            <input id="addInput" type="text" placeholder="書き足す…">
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="b primary" title="開始/停止">▶</div>
+          <div class="b" title="一時停止">⏸</div>
+          <div class="b" title="リセット">⟳</div>
+          <div class="sep"></div>
+          <div class="b" title="休憩">☕</div>
+          <div class="b" title="ポモドーロ">🍅</div>
+          <div class="b" id="themeBtn" title="紙⇔黒板">🌗</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    タイマー部か ∨ で開閉 ・ チェックで完了（赤ペン） ・ 🌗 で <b>紙</b>⇔<i>黒板</i><br>
+    未完了の作業は次セットへ自動で持ち越し（↪）／ 完了はアーカイブされます
+  </div>
+
+<script>
+  const note=document.getElementById('note');
+  const chev=document.getElementById('chev');
+  const zone=document.getElementById('timerzone');
+  const list=document.getElementById('list');
+  const addRow=document.getElementById('addRow');
+  const addInput=document.getElementById('addInput');
+  const themeBtn=document.getElementById('themeBtn');
+
+  const toggle=()=>note.classList.toggle('open');
+  chev.addEventListener('click',e=>{ e.stopPropagation(); toggle(); });
+  zone.addEventListener('click',toggle);
+
+  function fmt(s){ const m=Math.floor(s/60); return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+  function parseT(t){ const m=/^(\d+):(\d+)$/.exec((t||'').trim()); return m? (+m[1]*60 + +m[2]) : 0; }
+
+  // 親の集計（進捗・合計時間・走行/完了状態）を更新
+  function updateGroups(){
+    document.querySelectorAll('.group').forEach(g=>{
+      const kids=[...g.querySelectorAll('.row.child')];
+      const total=kids.length;
+      const done=kids.filter(k=>k.classList.contains('done')).length;
+      let sum=0; kids.forEach(k=>{ sum += parseT(k.querySelector('.t')?.textContent); });
+      const p=g.querySelector('.row.parent');
+      p.querySelector('.prog').textContent=done+'/'+total;
+      p.querySelector('.js-sum').textContent=fmt(sum);
+      p.classList.toggle('done', total>0 && done===total);
+      p.classList.toggle('anyrun', kids.some(k=>k.classList.contains('run')));
+    });
+  }
+
+  // チェック：子/単独はそのトグル、親は全子を連動
+  function toggleRow(row){ row.classList.toggle('done'); updateGroups(); }
+  function bindLeaf(chk){ chk.addEventListener('click',e=>{ e.stopPropagation(); toggleRow(chk.closest('.row')); }); }
+  list.querySelectorAll('.row.child > .chk, .list > .row:not(.parent) > .chk').forEach(bindLeaf);
+  list.querySelectorAll('.row.parent').forEach(p=>{
+    p.querySelector('.chk').addEventListener('click',e=>{ e.stopPropagation();
+      const kids=[...p.closest('.group').querySelectorAll('.row.child')];
+      const allDone=kids.every(k=>k.classList.contains('done'));
+      kids.forEach(k=>k.classList.toggle('done', !allDone)); updateGroups();
+    });
+    p.querySelector('.tri').addEventListener('click',e=>{ e.stopPropagation();
+      p.closest('.group').classList.toggle('collapsed'); });
+  });
+
+  addRow.addEventListener('click',()=>addInput.focus());
+  addInput.addEventListener('keydown',e=>{
+    if(e.key!=='Enter') return;
+    const v=addInput.value.trim(); if(!v) return;
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML='<span class="chk"></span><span class="name"></span><span class="t">00:00</span>';
+    row.querySelector('.name').textContent=v; bindLeaf(row.querySelector('.chk'));
+    list.appendChild(row); addInput.value='';
+  });
+
+  themeBtn.addEventListener('click',e=>{ e.stopPropagation(); note.classList.toggle('chalk'); });
+
+  const timers=[...document.querySelectorAll('.js-run')].map(el=>({
+    el, sec:parseInt(el.dataset.sec||'0',10), stop:el.hasAttribute('data-stop') }));
+  setInterval(()=>{ for(const t of timers){ if(!t.stop) t.sec++; t.el.textContent=fmt(t.sec); } updateGroups(); },1000);
+  updateGroups();
+  setInterval(()=>{ document.getElementById('clock').textContent=
+    new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); },15000);
+</script>
+</body>
+</html>

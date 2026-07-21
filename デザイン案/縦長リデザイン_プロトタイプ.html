@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MinimalTimer 縦長リデザイン — 開閉プロトタイプ</title>
+<style>
+  :root{
+    --paper:      rgba(255,255,255,0.74);
+    --ink:        #1E293B;
+    --ink-dim:    rgba(30,41,59,0.55);
+    --ink-faint:  rgba(30,41,59,0.30);
+    --hair:       rgba(30,41,59,0.10);
+    --accent:     #2563EB;
+    --accent-soft:rgba(37,99,235,0.12);
+    --run:        #16A34A;
+    --run-soft:   rgba(22,163,74,0.12);
+    --font: 'Segoe UI Variable Display','Segoe UI','Helvetica Neue',Arial,sans-serif;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{
+    font-family:var(--font); color:var(--ink);
+    background:
+      radial-gradient(900px 500px at 15% -10%, #dfe7f3 0%, transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, #f3e9df 0%, transparent 50%),
+      linear-gradient(160deg,#eef1f6 0%,#f4f1ec 100%);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:22px; padding:40px;
+  }
+  .head{ text-align:center; }
+  .head h1{ font-size:19px; font-weight:600; }
+  .head p{ font-size:12px; color:var(--ink-dim); margin-top:6px; }
+  .head b{ color:var(--accent); }
+
+  /* ── ウィジェット本体（すりガラス・ライト） ─────── */
+  .widget{
+    position:relative; width:230px; border-radius:22px;
+    background:var(--paper); backdrop-filter:blur(22px) saturate(1.3);
+    border:1px solid rgba(255,255,255,0.9);
+    box-shadow:0 18px 44px rgba(30,41,59,.16), inset 0 1px 0 rgba(255,255,255,.9);
+  }
+  .widget::after{ content:''; position:absolute; inset:0; pointer-events:none; border-radius:22px;
+    background:radial-gradient(120% 55% at 50% -6%, rgba(255,255,255,.65), transparent 55%); }
+
+  .topbar{ position:relative; z-index:4; display:flex; align-items:center; gap:8px;
+    height:32px; padding:0 12px; color:var(--ink-faint); }
+  .topbar .pin{ color:var(--accent); opacity:.9; cursor:pointer; }
+  .topbar .spacer{ flex:1; }
+  .chev{ cursor:pointer; display:flex; align-items:center; justify-content:center;
+    width:22px; height:22px; border-radius:6px; transition:background .15s, transform .38s cubic-bezier(.4,0,.2,1); }
+  .chev:hover{ background:var(--accent-soft); color:var(--accent); }
+  .chev svg{ width:14px; height:14px; }
+  .widget.open .chev{ transform:rotate(180deg); }
+
+  /* タイマー領域（クリックで開閉） */
+  .timer-zone{ position:relative; z-index:3; text-align:center; padding:2px 16px 0; cursor:pointer; }
+  .clock{ font-size:12px; letter-spacing:1.5px; color:var(--ink-dim); font-variant-numeric:tabular-nums; }
+  .big{ font-weight:200; letter-spacing:-1px; font-variant-numeric:tabular-nums; line-height:1;
+    color:var(--ink); font-size:44px; margin:2px 0 12px; }
+  .pbar{ height:2px; border-radius:2px; background:var(--accent-soft); position:relative; margin:0 16px; }
+  .pbar>i{ position:absolute; left:0; top:0; bottom:0; border-radius:2px; background:var(--accent);
+    width:62%; transition:width .5s linear; }
+
+  /* 折りたたみ時のサマリー（実行中バッジ） */
+  .pills{ display:flex; gap:7px; justify-content:center; overflow:hidden;
+    max-height:60px; opacity:1; padding:14px 0; margin:0;
+    transition:max-height .38s cubic-bezier(.4,0,.2,1), opacity .22s, padding .38s; }
+  .widget.open .pills{ max-height:0; opacity:0; padding:0; }
+  .pill{ display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:600;
+    padding:3px 9px; border-radius:20px; }
+  .pill.run{ color:var(--run); background:var(--run-soft); }
+  .pill.chk{ color:var(--accent); background:var(--accent-soft); }
+
+  /* 展開領域（grid 0fr↔1fr で高さアニメ） */
+  .expand{ display:grid; grid-template-rows:0fr;
+    transition:grid-template-rows .38s cubic-bezier(.4,0,.2,1); }
+  .widget.open .expand{ grid-template-rows:1fr; }
+  .expand-inner{ overflow:hidden; }
+
+  .list{ display:flex; flex-direction:column; gap:12px; padding:6px 16px 4px; }
+  .row{ display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink); }
+  .chk{ flex:0 0 auto; width:15px; height:15px; border-radius:5px; border:1.5px solid var(--ink-faint);
+    position:relative; cursor:pointer; transition:.15s; }
+  .row.done .chk{ background:var(--accent); border-color:var(--accent); }
+  .row.done .chk::after{ content:''; position:absolute; left:4px; top:1px; width:4px; height:8px;
+    border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .row.done .name{ color:var(--ink-faint); text-decoration:line-through; }
+  .name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .t{ font-size:11px; color:var(--ink-dim); font-variant-numeric:tabular-nums; }
+  .row.run .t{ color:var(--run); }
+  .runled{ width:6px; height:6px; border-radius:50%; background:var(--run);
+    box-shadow:0 0 6px var(--run); animation:pulse 1.5s ease-in-out infinite; flex:0 0 auto; }
+  @keyframes pulse{ 0%,100%{opacity:.4;transform:scale(.8)} 50%{opacity:1;transform:scale(1.1)} }
+
+  .add{ display:flex; align-items:center; gap:9px; color:var(--ink-faint); font-size:11.5px;
+    padding:11px 16px 10px; margin:4px 16px 0; border-top:1px dashed var(--hair); cursor:text; }
+  .add .plus{ width:15px; text-align:center; font-size:13px; }
+  .add input{ flex:1; border:none; background:none; outline:none; font-family:var(--font);
+    font-size:11.5px; color:var(--ink); }
+  .add input::placeholder{ color:var(--ink-faint); }
+
+  .toolbar{ display:flex; align-items:center; justify-content:center; gap:4px; height:44px;
+    border-top:1px solid var(--hair); }
+  .toolbar .b{ width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; color:var(--ink-dim); cursor:pointer; font-size:13px; transition:.15s; }
+  .toolbar .b:hover{ color:var(--accent); background:var(--accent-soft); }
+  .toolbar .b.primary{ color:var(--ink); }
+  .toolbar .sep{ width:1px; height:16px; background:var(--hair); margin:0 3px; }
+
+  .foot{ font-size:11px; color:var(--ink-faint); }
+  .foot kbd{ background:rgba(30,41,59,.08); border-radius:4px; padding:1px 6px; font-family:var(--font); }
+
+  /* ── ダークテンプレ ── */
+  .widget.dark{
+    --paper:rgba(13,17,23,0.82); --ink:#E6EDF3;
+    --ink-dim:rgba(230,237,243,.55); --ink-faint:rgba(230,237,243,.28);
+    --hair:rgba(255,255,255,.08); --accent:#58A6FF; --accent-soft:rgba(88,166,255,.16);
+    --run:#4ADE80; --run-soft:rgba(74,222,128,.15);
+    border:1px solid rgba(255,255,255,.06);
+    box-shadow:0 18px 44px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .widget.dark::after{ background:radial-gradient(120% 55% at 50% -6%, rgba(255,255,255,.08), transparent 55%); }
+  .widget.dark .row.done .chk::after{ border-color:#0D1117; }
+</style>
+</head>
+<body>
+
+  <div class="head">
+    <h1>作業リスト 開閉プロトタイプ</h1>
+    <p>タイマー部か <b>∨</b> をクリックで開閉。既定は畳んで最小占有。</p>
+  </div>
+
+  <div class="widget" id="widget">
+    <div class="topbar">
+      <span class="pin" title="最前面固定">📌</span>
+      <span class="spacer"></span>
+      <span class="chev" id="chev" title="作業リストを開閉">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+    </div>
+
+    <div class="timer-zone" id="timerZone">
+      <span class="clock" id="clock">14:30</span>
+      <div class="big">24:12</div>
+    </div>
+    <div class="pbar"><i></i></div>
+
+    <div class="pills">
+      <span class="pill run"><span class="runled"></span>3 実行中</span>
+      <span class="pill chk">☑ 1/4</span>
+    </div>
+
+    <div class="expand">
+      <div class="expand-inner">
+        <div class="list" id="list">
+          <div class="row done"><span class="chk"></span><span class="name">要約をAIに依頼</span><span class="t js-run" data-sec="320" data-stop>05:20</span></div>
+          <div class="row run"><span class="chk"></span><span class="name">LP文章を書く</span><span class="runled"></span><span class="t js-run" data-sec="768">12:48</span></div>
+          <div class="row run"><span class="chk"></span><span class="name">コード生成 (Claude)</span><span class="runled"></span><span class="t js-run" data-sec="483">08:03</span></div>
+          <div class="row"><span class="chk"></span><span class="name">メール返信</span><span class="t">00:00</span></div>
+        </div>
+        <div class="add" id="addRow">
+          <span class="plus">＋</span>
+          <input type="text" placeholder="作業を追加..." id="addInput">
+        </div>
+        <div class="toolbar">
+          <div class="b primary" title="開始/停止">▶</div>
+          <div class="b" title="一時停止">⏸</div>
+          <div class="b" title="リセット">⟳</div>
+          <div class="sep"></div>
+          <div class="b" title="休憩">☕</div>
+          <div class="b" title="ポモドーロ">🍅</div>
+          <div class="b" id="themeBtn" title="テーマ切替">🌗</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">クリックで開閉 ・ チェックで完了 ・ <kbd>🌗</kbd> でダーク切替 ・ ＋欄に入力→Enterで追加</div>
+
+<script>
+  const widget = document.getElementById('widget');
+  const chev   = document.getElementById('chev');
+  const zone   = document.getElementById('timerZone');
+  const list   = document.getElementById('list');
+  const addInput = document.getElementById('addInput');
+  const addRow = document.getElementById('addRow');
+  const themeBtn = document.getElementById('themeBtn');
+
+  // ── 開閉 ─────────────────────────────
+  function toggle(){ widget.classList.toggle('open'); }
+  chev.addEventListener('click', (e)=>{ e.stopPropagation(); toggle(); });
+  zone.addEventListener('click', toggle);
+
+  // ── チェック（完了トグル） ───────────
+  function bindCheck(el){
+    el.addEventListener('click', e=>{ e.stopPropagation(); el.closest('.row').classList.toggle('done'); });
+  }
+  document.querySelectorAll('.chk').forEach(bindCheck);
+
+  // ── 作業を追加 ───────────────────────
+  addRow.addEventListener('click', ()=> addInput.focus());
+  addInput.addEventListener('keydown', e=>{
+    if(e.key!=='Enter') return;
+    const name = addInput.value.trim(); if(!name) return;
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = '<span class="chk"></span><span class="name"></span><span class="t">00:00</span>';
+    row.querySelector('.name').textContent = name;
+    bindCheck(row.querySelector('.chk'));
+    list.appendChild(row);
+    addInput.value = '';
+  });
+
+  // ── テーマ切替（ダークテンプレ） ─────
+  themeBtn.addEventListener('click', e=>{ e.stopPropagation(); widget.classList.toggle('dark'); });
+
+  // ── ライブ計測（走行中の行だけ進む） ─
+  function fmt(s){ const m=Math.floor(s/60); return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+  const timers=[...document.querySelectorAll('.js-run')].map(el=>({
+    el, sec:parseInt(el.dataset.sec||'0',10), stopped:el.hasAttribute('data-stop') }));
+  setInterval(()=>{ for(const t of timers){ if(t.stopped) continue; t.sec++; t.el.textContent=fmt(t.sec); } },1000);
+
+  // 時計
+  setInterval(()=>{ document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }, 15000);
+</script>
+</body>
+</html>
