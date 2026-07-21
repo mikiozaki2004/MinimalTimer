@@ -1057,6 +1057,17 @@ document.addEventListener('keydown', (e) => {
   draw();
 });
 
+// ── Keyboard: T でデザインテンプレートを循環（円↔ノート↔黒板） ─────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 't' && e.key !== 'T') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (timerInputEl.style.display === 'block' || noteTimerInput.style.display === 'block') return;
+  e.preventDefault();
+  cycleTemplate();
+});
+
 // ── Task state ─────────────────────────────────────────────────────────────
 let currentTask = '';
 let currentDetail = '';
