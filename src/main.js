@@ -294,8 +294,9 @@ function setPlayIcon(playing) {
   syncNoteButtons();
 }
 
-// ノートのトグルボタン状態（休憩/ポモ/ピン）を円側の状態に同期
+// ノートのトグルボタン状態（モード/休憩/ポモ/ピン）を円側の状態に同期
 function syncNoteButtons() {
+  document.getElementById('note-mode')?.classList.toggle('active', st.mode === 'countup');
   document.getElementById('note-break')?.classList.toggle('active', st.breakMode);
   document.getElementById('note-pomo')?.classList.toggle('active', pomo.active);
   notePin?.classList.toggle('pinned', st.pinned);
@@ -1348,8 +1349,10 @@ noteChev?.addEventListener('click', (e) => { e.stopPropagation(); noteui.toggleC
 notePlayBtn?.addEventListener('click', (e) => { e.stopPropagation(); btnPlay.click(); });
 notePauseBtn?.addEventListener('click', (e) => { e.stopPropagation(); btnPause.click(); });
 document.getElementById('note-reset')?.addEventListener('click', (e) => { e.stopPropagation(); btnReset.click(); });
+document.getElementById('note-mode')?.addEventListener('click', (e) => { e.stopPropagation(); btnMode.click(); syncNoteButtons(); });
 document.getElementById('note-break')?.addEventListener('click', (e) => { e.stopPropagation(); btnBreak.click(); });
 document.getElementById('note-pomo')?.addEventListener('click', (e) => { e.stopPropagation(); btnPomo.click(); });
+document.getElementById('note-records')?.addEventListener('click', (e) => { e.stopPropagation(); btnRecords.click(); });
 document.getElementById('note-template-btn')?.addEventListener('click', (e) => { e.stopPropagation(); cycleTemplate(); });
 
 // 円テンプレート: 作業リストのドロワー開閉

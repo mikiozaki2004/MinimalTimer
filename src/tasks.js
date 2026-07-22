@@ -139,7 +139,8 @@ function toggleDone(item, isChild, parent) {
 function addTop(text) {
   const t = text.trim();
   if (!t) return;
-  items.push(normItem({ text: t, bornSet: currentSet }));
+  // 新しい作業はリストの一番上に追加する
+  items.unshift(normItem({ text: t, bornSet: currentSet }));
   persist({ immediate: true });
   render();
 }
