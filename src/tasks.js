@@ -16,6 +16,7 @@ let containerEl = null;
 let addInputEl = null;
 let logger = null;          // (span) => void   span={text, duration, startedAt, endedAt}
 let onRunChange = null;     // () => void       走行状態が変わったとき通知
+let onLayout = null;        // () => void       行数が変わりうる再描画のあとに通知（高さ自動調整用）
 
 const now = () => Date.now();
 const rid = () => Math.random().toString(36).slice(2, 9);
@@ -72,6 +73,12 @@ function allLeaves() {
 
 export function runningLeafCount() {
   return allLeaves().filter(l => l.running).length;
+}
+
+// 末端（計測単位）の進捗。円ドロワーの件数バッジ等に使う。
+export function leafProgress() {
+  const leaves = allLeaves();
+  return { done: leaves.filter(l => l.done).length, total: leaves.length };
 }
 
 function startLeaf(leaf) {
@@ -206,6 +213,7 @@ function renderLeafRow(leaf, { child = false, parent = null } = {}) {
 // 親（グループ）
 function renderGroup(item) {
   const g = el('div', 'group');
+  g.dataset.itemId = item.id;        // tick で集計だけをその場更新するため
   const anyRun = item.children.some(c => c.running);
   const parentRow = el('div', `row parent${item.done ? ' done' : ''}${anyRun ? ' anyrun' : ''}${isCarried(item) ? ' carried' : ''}`);
   const tri = el('span', 'tri', item._collapsed ? '▶' : '▼');
@@ -241,13 +249,23 @@ function beginInlineAdd(afterRow, parent) {
   wrap.append(el('span', 'chk ghost'), input);
   afterRow.insertAdjacentElement('afterend', wrap);
   input.focus();
+  // Enter と blur の両方が addChild を呼び、子作業が2つ追加されるのを防ぐガード。
+  // addChild → render() で input が DOM から外れると blur が発火するため、一度確定したら無視する。
+  let committed = false;
+  const commit = () => {
+    if (committed) return;
+    committed = true;
+    const v = input.value.trim();
+    if (v) addChild(parent, v);
+    else render();
+  };
   input.addEventListener('mousedown', (e) => e.stopPropagation());
   input.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    if (e.key === 'Enter') { e.preventDefault(); addChild(parent, input.value); }
-    if (e.key === 'Escape') render();
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { committed = true; render(); }
   });
-  input.addEventListener('blur', () => { if (input.value.trim()) addChild(parent, input.value); else render(); });
+  input.addEventListener('blur', commit);
 }
 
 export function render() {
@@ -259,44 +277,69 @@ export function render() {
   for (const item of items) {
     containerEl.append(item.children.length ? renderGroup(item) : renderLeafRow(item));
   }
+  // 行数が変わりうる再描画のあとに高さ自動調整などを通知する
+  onLayout?.();
 }
 
-// 毎秒更新。走行中があれば軽く再描画して時間・親集計を反映する。
-// 子作業のインライン入力中は再描画しない（入力が消えないように）。
+// 表示先コンテナを切り替える（ノート ⇔ 円ドロワーで同じ作業リストを共有するため）。
+// 追加欄も差し替えて、切替先の入力に Enter で先頭追加できるようにする。
+export function setContainer(container, addInput) {
+  containerEl = container || null;
+  if (addInput && addInput !== addInputEl) {
+    addInputEl = addInput;
+    wireAddInput(addInputEl);
+  }
+  render();
+}
+
+// 毎秒更新。走行中の時間表示だけをその場で書き換える。
+// 全再描画はしない（スクロール位置がリセットされたり、高さ再計算が毎秒走るのを防ぐ）。
 function tick() {
   if (!containerEl) return;
   if (runningLeafCount() === 0) return;
-  if (containerEl.querySelector('.inline-add-input')) {
-    // 入力中は末端の秒だけを直接書き換える
-    for (const l of allLeaves()) {
-      if (!l.running) continue;
-      const span = containerEl.querySelector(`.t[data-leaf-id="${l.id}"]`);
-      if (span) span.textContent = fmt(liveSec(l));
-    }
-    return;
+  // 末端（子・単独）の経過秒を更新
+  for (const l of allLeaves()) {
+    if (!l.running) continue;
+    const span = containerEl.querySelector(`.t[data-leaf-id="${l.id}"]`);
+    if (span) span.textContent = fmt(liveSec(l));
   }
-  render();
+  // 走行中の子を持つ親（グループ）の集計を更新（折りたたみ中でも反映）
+  for (const item of items) {
+    if (!item.children.length || !item.children.some(c => c.running)) continue;
+    const sumEl = containerEl.querySelector(`.group[data-item-id="${item.id}"] .js-sum`);
+    if (sumEl) {
+      const sum = item.children.reduce((a, c) => a + (c.done ? c.accumulatedSec : liveSec(c)), 0);
+      sumEl.textContent = fmt(sum);
+    }
+  }
   persist(); // throttled
 }
 
+// 先頭追加欄（ノート／円ドロワーの「書き足す」入力）に Enter/Escape を配線する。
+// 二重配線を避けるため、配線済みの要素には dataset フラグを立てる。
+function wireAddInput(input) {
+  if (!input || input.dataset.mtWired) return;
+  input.dataset.mtWired = '1';
+  input.addEventListener('mousedown', (e) => e.stopPropagation());
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); addTop(input.value); input.value = ''; }
+    if (e.key === 'Escape') input.value = '';
+  });
+}
+
 // ── 初期化 ──────────────────────────────────────────────
-export function initTasks({ container, addInput, log, onRunningChange } = {}) {
+export function initTasks({ container, addInput, log, onRunningChange, onLayoutChange } = {}) {
   containerEl = container;
   addInputEl = addInput;
   logger = log || null;
   onRunChange = onRunningChange || null;
+  onLayout = onLayoutChange || null;
 
   items = normalize(storageGet('mt_active_items', []));
   currentSet = Number(storageGet('mt_active_set', 1)) || 1;
 
-  if (addInputEl) {
-    addInputEl.addEventListener('mousedown', (e) => e.stopPropagation());
-    addInputEl.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') { e.preventDefault(); addTop(addInputEl.value); addInputEl.value = ''; }
-      if (e.key === 'Escape') addInputEl.value = '';
-    });
-  }
+  wireAddInput(addInputEl);
 
   render();
   setInterval(tick, 1000);

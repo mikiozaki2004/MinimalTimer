@@ -1169,10 +1169,13 @@ html[data-template="chalk"] .nt-binding i { background: radial-gradient(circle a
   border-radius: 2px; transform: rotate(-8deg); }
 .nt-tally .marks i.on { opacity: .9; background: var(--nt-ink); }
 
-/* 開閉領域 */
-.nt-expand { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .38s cubic-bezier(.4,0,.2,1); }
-.note-tpl.collapsed .nt-expand { grid-template-rows: 0fr; }
+/* 開閉領域。畳む/開くはウィンドウ高さのアニメーション（noteui.js）で行い、
+   はみ出しは .note-tpl の overflow:hidden がクリップする。 */
+.nt-expand { display: block; }
 .nt-expand-inner { overflow: hidden; }
+/* 折りたたみ中は開閉領域をふわっと消す（高さアニメと同調） */
+.note-tpl.collapsed .nt-expand-inner { opacity: 0; transition: opacity .18s ease; }
+.note-tpl:not(.collapsed) .nt-expand-inner { opacity: 1; transition: opacity .28s ease .06s; }
 
 /* 罫線＋マージンの紙面 */
 .nt-paper { position: relative; margin-top: 8px;
@@ -1255,3 +1258,104 @@ html[data-template="chalk"] .nt-b:hover { background: rgba(255,255,255,.08); }
 .nt-b.active { color: var(--nt-accent); }
 .nt-sep { width: 1px; height: 16px; background: rgba(0,0,0,.12); margin: 0 3px; }
 html[data-template="chalk"] .nt-sep { background: rgba(255,255,255,.12); }
+
+/* リストが上限高さに達したときのスクロール（細い罫線色のバー） */
+.nt-list { scrollbar-width: thin; scrollbar-color: var(--nt-pencil) transparent; overscroll-behavior: contain; }
+.nt-list::-webkit-scrollbar { width: 6px; }
+.nt-list::-webkit-scrollbar-thumb { background: var(--nt-pencil); border-radius: 3px; opacity: .5; }
+.nt-list::-webkit-scrollbar-track { background: transparent; }
+
+/* ── 自由リサイズ用の掴みしろ（右・下・右下角） ─────────────────── */
+.nt-resize { position: absolute; z-index: 6; background: transparent; }
+.nt-resize-e  { top: 34px; right: 0; width: 7px; height: calc(100% - 34px); cursor: ew-resize; }
+.nt-resize-s  { left: 0; bottom: 0; width: 100%; height: 7px; cursor: ns-resize; }
+.nt-resize-se { right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize; z-index: 7; }
+/* 右下角に控えめなグリップ表示（ホバーで少し濃く） */
+.nt-resize-se::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px;
+  border-right: 2px solid var(--nt-pencil); border-bottom: 2px solid var(--nt-pencil);
+  opacity: .35; border-radius: 0 0 3px 0; transition: opacity .15s; }
+.note-tpl:hover .nt-resize-se::after { opacity: .6; }
+.nt-resize-se:hover::after { opacity: 1; }
+.note-tpl.nt-resizing { user-select: none; }
+
+/* ══════════════════════════════════════════════════════════════════
+   円テンプレート用・作業リストのドロワー（円の下に展開）
+   ══════════════════════════════════════════════════════════════════ */
+.ctask {
+  position: absolute; left: 0; top: 280px; display: none; flex-direction: column;
+  border-radius: 16px; overflow: hidden;
+  background: var(--bg); color: var(--fg);
+  box-shadow: var(--panel-shadow), inset 0 1px 0 rgba(255,255,255,.05);
+  font-family: var(--font-ui);
+}
+html[data-template="note"] .ctask, html[data-template="chalk"] .ctask { display: none !important; }
+
+.ctask-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px 5px;
+  font-size: 12px; letter-spacing: .3px; color: var(--fg); opacity: .9; flex: 0 0 auto; cursor: default; }
+.ctask-title { font-weight: 600; }
+.ctask-title::before { content: '✔'; margin-right: 6px; color: var(--ring); font-size: 11px; }
+.ctask-count { margin-left: auto; font-size: 11px; color: var(--fg); opacity: .55; font-variant-numeric: tabular-nums; }
+
+.ctask-list { padding: 2px 8px 2px; overflow-y: auto; flex: 1 1 auto;
+  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--fg) 35%, transparent) transparent; }
+.ctask-list::-webkit-scrollbar { width: 6px; }
+.ctask-list::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 30%, transparent); border-radius: 3px; }
+.ctask-list .list-empty { padding: 8px 10px; font-size: 12px; color: var(--fg); opacity: .5; }
+
+/* 行（tasks.js が描画。ノートとは別スタイル） */
+.ctask-list .row { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 6px;
+  position: relative; font-size: 13px; color: var(--fg); border-radius: 7px; transition: background .12s; }
+.ctask-list .row:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.ctask-list .chk { width: 15px; height: 15px; border: 1.5px solid color-mix(in srgb, var(--fg) 45%, transparent);
+  border-radius: 5px; position: relative; cursor: pointer; flex: 0 0 auto; transition: border-color .12s; }
+.ctask-list .chk.ghost { opacity: .4; }
+.ctask-list .row.done .chk { background: var(--ring); border-color: var(--ring); }
+.ctask-list .row.done .chk::after { content: '✓'; position: absolute; left: 1px; top: -3px; font-size: 12px;
+  color: var(--bg); font-weight: 700; }
+.ctask-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.ctask-list .row.run .name { color: var(--ring); font-weight: 600; }
+.ctask-list .row.done .name { opacity: .5; text-decoration: line-through; cursor: default; }
+.ctask-list .t { font-size: 11px; color: var(--fg); opacity: .55; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.ctask-list .row.run .t { color: var(--ring); opacity: 1; }
+.ctask-list .row-add { margin-left: 2px; color: var(--ring); font-size: 14px; opacity: 0; cursor: pointer; transition: opacity .12s; flex: 0 0 auto; }
+.ctask-list .row:hover .row-add { opacity: .7; }
+.ctask-list .row-add:hover { opacity: 1 !important; }
+
+/* 親（グループ） */
+.ctask-list .row.parent { padding-left: 18px; }
+.ctask-list .row.parent .name { font-weight: 600; }
+.ctask-list .tri { position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
+  color: color-mix(in srgb, var(--fg) 55%, transparent); cursor: pointer; font-size: 9px; user-select: none; }
+.ctask-list .agg { font-size: 10.5px; color: var(--fg); opacity: .55; white-space: nowrap; flex: 0 0 auto; }
+.ctask-list .agg .prog { color: var(--ring); opacity: 1; }
+.ctask-list .children { position: relative; margin-left: 20px; }
+.ctask-list .children::before { content: ''; position: absolute; left: -2px; top: 0; bottom: 14px;
+  width: 1.5px; background: color-mix(in srgb, var(--fg) 20%, transparent); }
+.ctask-list .row.child { padding-left: 12px; }
+.ctask-list .row.child .name { font-size: 12.5px; opacity: .92; }
+.ctask-list .row.carried .name::before { content: '↪ '; color: var(--ring); }
+.ctask-list .inline-add-input, .ctask-add-input {
+  flex: 1; border: none; background: none; outline: none; font-family: inherit; font-size: 13px;
+  color: var(--fg); user-select: text; -webkit-user-select: text; }
+.ctask-list .inline-add-input::placeholder, .ctask-add-input::placeholder { color: var(--fg); opacity: .4; }
+
+/* 追加欄 */
+.ctask-add { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent); flex: 0 0 auto; }
+.ctask-plus { color: var(--ring); font-size: 14px; }
+
+/* 円下端の作業リスト開閉タブ */
+.circle-listtab {
+  position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%) scale(.8);
+  width: 34px; height: 18px; border: none; border-radius: 9px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--fg) 12%, transparent); color: var(--fg);
+  opacity: 0; pointer-events: none; transition: opacity .3s ease, transform .3s ease, background .15s; z-index: 6;
+}
+.circle:hover .circle-listtab { opacity: .8; pointer-events: all; transform: translateX(-50%) scale(1); }
+.circle-listtab:hover { opacity: 1 !important; background: color-mix(in srgb, var(--fg) 20%, transparent); }
+.circle-listtab.open { opacity: .85; pointer-events: all; transform: translateX(-50%) scale(1); }
+.circle-listtab svg { width: 14px; height: 14px; transition: transform .3s ease; }
+.circle-listtab.open svg { transform: rotate(180deg); }
+/* 円テンプレート以外ではタブを隠す */
+html[data-template="note"] .circle-listtab, html[data-template="chalk"] .circle-listtab { display: none; }

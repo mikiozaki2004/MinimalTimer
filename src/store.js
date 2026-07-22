@@ -13,6 +13,8 @@ const SYNC_KEYS = [
 // このPC固有のキー（ウィンドウ位置・カメラ設定など）
 const LOCAL_KEYS = [
   'mt_window_size', 'mt_window_pos',
+  // ノート/黒板のウィンドウ幾何・円ドロワーの開閉状態（PCごとの表示設定）
+  'mt_note_w', 'mt_note_maxh', 'mt_note_scale', 'mt_note_collapsed', 'mt_classic_open',
   'mt_timelapse_enabled', 'mt_timelapse_camera_id', 'mt_timelapse_interval_sec',
   'mt_timelapse_fps', 'mt_timelapse_resolution',
   'mt_data_path', 'mt_data_synced_at', 'mt_data_modified_at',

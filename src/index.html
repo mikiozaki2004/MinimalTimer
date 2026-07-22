@@ -99,6 +99,11 @@
       </svg>
     </button>
 
+    <!-- 作業リストの開閉タブ（円の下端中央） -->
+    <button class="circle-listtab" id="classic-list-toggle" title="作業リスト">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+
     <!-- Records context menu -->
     <div class="ctx-menu" id="records-ctx-menu">
       <button class="ctx-menu-item" id="ctx-template">デザインテンプレート切替</button>
@@ -177,6 +182,19 @@
       <button class="sheets-bulk-btn" id="tl-open-folder-btn">保存フォルダを開く</button>
     </div>
 
+  </div>
+
+  <!-- ── 円テンプレート用・作業リストのドロワー（円の下に展開） ───────── -->
+  <div class="ctask" id="classic-tasks" aria-hidden="true">
+    <div class="ctask-head" data-tauri-drag-region>
+      <span class="ctask-title">やること</span>
+      <span class="ctask-count" id="classic-count"></span>
+    </div>
+    <div class="ctask-list" id="classic-list"></div>
+    <div class="ctask-add" id="classic-add-row">
+      <span class="ctask-plus">＋</span>
+      <input class="ctask-add-input" id="classic-add-input" type="text" maxlength="40" placeholder="書き足す…">
+    </div>
   </div>
 
   <!-- ── Note / Chalk template (縦長長方形・作業リスト) ─────────────── -->

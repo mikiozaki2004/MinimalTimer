@@ -2,6 +2,7 @@ import { initStorage, storageGet, storageGetFresh, storageSet, flushStorage, get
 import { initWater, resetWater, ensureLoop as waterEnsureLoop } from './water.js';
 import * as timelapse from './timelapse.js';
 import * as tasks from './tasks.js';
+import * as noteui from './noteui.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const CIRCUMFERENCE = 2 * Math.PI * 126;
@@ -42,19 +43,74 @@ function onRunningChanged(running) {
   }
 }
 
-// ── Window size ────────────────────────────────────────────────────────────
+// ── Window size (classic / circle) ──────────────────────────────────────────
 let currentWindowSize = 280;
+let classicOpen = false;                 // 円テンプレートで作業リストのドロワーを開いているか
+const CLASSIC_DRAWER_MAX = 260;          // ドロワーの最大高さ（超えるとリスト内スクロール）
+const CLASSIC_DRAWER_GAP = 6;            // 円とドロワーの隙間
 
 async function applyWindowSize(size) {
-  currentWindowSize = size;
-  const scale = size / 280;
+  currentWindowSize = Math.max(140, Math.min(560, size));
+  circle.style.zoom = currentWindowSize / 280;
+  storageSet('mt_window_size', currentWindowSize);
+  await applyClassicGeometry();
+}
+
+// 円 + （開いていれば）作業リストのドロワーに合わせてウィンドウ矩形を決める。
+// 円は上部の正方形に固定し、ドロワーはその下へ展開する。
+async function applyClassicGeometry() {
+  const size = currentWindowSize;
+  let h = size;
+  if (classicOpen && classicTasksEl) {
+    classicTasksEl.style.display = 'flex';
+    classicTasksEl.style.width = size + 'px';
+    classicTasksEl.style.top = (size + CLASSIC_DRAWER_GAP) + 'px';
+    const drawerH = measureClassicDrawer();
+    h = size + CLASSIC_DRAWER_GAP + drawerH;
+  } else if (classicTasksEl) {
+    classicTasksEl.style.display = 'none';
+  }
   document.documentElement.style.width = size + 'px';
-  document.documentElement.style.height = size + 'px';
   document.body.style.width = size + 'px';
-  document.body.style.height = size + 'px';
-  circle.style.zoom = scale;
-  storageSet('mt_window_size', size);
-  await window.__TAURI__?.core?.invoke?.('resize_window', { size });
+  document.documentElement.style.height = h + 'px';
+  document.body.style.height = h + 'px';
+  await window.__TAURI__?.core?.invoke?.('resize_window_rect', { width: size, height: h });
+}
+
+// ドロワーの中身に合わせた高さを求め、上限を超える分はリストをスクロールさせる。
+function measureClassicDrawer() {
+  const listEl = classicList;
+  const prevMax = listEl.style.maxHeight, prevOv = listEl.style.overflowY;
+  listEl.style.maxHeight = 'none';
+  listEl.style.overflowY = 'visible';
+  const naturalH = classicTasksEl.offsetHeight;
+  const listNaturalH = listEl.scrollHeight;
+  const nonListH = Math.max(0, naturalH - listNaturalH);
+  let drawerH, listMax = 'none';
+  if (naturalH <= CLASSIC_DRAWER_MAX) {
+    drawerH = naturalH;
+  } else {
+    drawerH = CLASSIC_DRAWER_MAX;
+    listMax = Math.max(48, CLASSIC_DRAWER_MAX - nonListH) + 'px';
+  }
+  listEl.style.maxHeight = listMax;
+  listEl.style.overflowY = listMax === 'none' ? '' : 'auto';
+  return drawerH;
+}
+
+function toggleClassicDrawer() {
+  classicOpen = !classicOpen;
+  storageSet('mt_classic_open', classicOpen);
+  classicListToggle?.classList.toggle('open', classicOpen);
+  classicTasksEl?.setAttribute('aria-hidden', String(!classicOpen));
+  applyClassicGeometry();
+}
+
+// ドロワー見出しの件数バッジを更新する
+function updateClassicCount() {
+  if (!classicCount) return;
+  const { done, total } = tasks.leafProgress();
+  classicCount.textContent = total ? `${done}/${total}` : '';
 }
 
 // ポモドーロ状態
@@ -106,10 +162,16 @@ const notePin = document.getElementById('note-pin');
 const notePlayBtn = document.getElementById('note-play');
 const notePauseBtn = document.getElementById('note-pause');
 
+// ── Classic (circle) task drawer refs ────────────────────────────────────────
+const classicTasksEl = document.getElementById('classic-tasks');
+const classicList = document.getElementById('classic-list');
+const classicAddInput = document.getElementById('classic-add-input');
+const classicCount = document.getElementById('classic-count');
+const classicListToggle = document.getElementById('classic-list-toggle');
+
 // テンプレート状態（'note' | 'chalk' | 'classic'）
+// ノート/黒板のウィンドウ幾何（自動高さ・リサイズ・拡大縮小・開閉）は noteui.js が担当する。
 let template = 'note';
-let noteCollapsed = false;
-const NOTE_W = 264, NOTE_H_OPEN = 470, NOTE_H_COLLAPSED = 196;
 
 // ── Water animation ────────────────────────────────────────────────────────
 initWater(
@@ -1208,18 +1270,16 @@ async function applyTemplate(tpl) {
   document.documentElement.dataset.template = template;
   storageSet('mt_template', template);
   if (template === 'classic') {
-    // 円テンプレート: 従来どおり正方形サイズ
-    await applyWindowSize(currentWindowSize);
+    // 円テンプレート: 正方形の円 + 下に展開する作業リストのドロワー
+    noteui.setActive(false);
+    tasks.setContainer(classicList, classicAddInput);
+    updateClassicCount();
+    await applyWindowSize(currentWindowSize);   // circle zoom + drawer geometry
   } else {
-    // ノート/黒板: 縦長長方形
-    noteTpl.classList.toggle('collapsed', noteCollapsed);
-    const h = noteCollapsed ? NOTE_H_COLLAPSED : NOTE_H_OPEN;
+    // ノート/黒板: 中身に合わせた縦長長方形（幾何は noteui.js が管理）
     circle.style.zoom = '';
-    document.documentElement.style.width = NOTE_W + 'px';
-    document.documentElement.style.height = h + 'px';
-    document.body.style.width = NOTE_W + 'px';
-    document.body.style.height = h + 'px';
-    await window.__TAURI__?.core?.invoke?.('resize_window_rect', { width: NOTE_W, height: h });
+    tasks.setContainer(noteList, noteAddInput);
+    noteui.setActive(true);
   }
   refreshText();
   draw();
@@ -1231,13 +1291,14 @@ function cycleTemplate() {
   applyTemplate(order[(order.indexOf(template) + 1) % order.length]);
 }
 
-async function toggleNoteCollapse() {
-  noteCollapsed = !noteCollapsed;
-  noteTpl.classList.toggle('collapsed', noteCollapsed);
-  const h = noteCollapsed ? NOTE_H_COLLAPSED : NOTE_H_OPEN;
-  document.documentElement.style.height = h + 'px';
-  document.body.style.height = h + 'px';
-  await window.__TAURI__?.core?.invoke?.('resize_window_rect', { width: NOTE_W, height: h });
+// 作業リストの行数が変わるたびに呼ばれ、表示中テンプレートの高さを調整する。
+function onTaskLayoutChanged() {
+  if (template === 'classic') {
+    updateClassicCount();
+    if (classicOpen) applyClassicGeometry();
+  } else {
+    noteui.refit({ animate: false });
+  }
 }
 
 // ノートのタイマー編集（円の openEdit/closeEdit と同じ挙動）
@@ -1283,13 +1344,16 @@ function logTaskSpan(span) {
 
 // ── Note template event wiring ──────────────────────────────────────────────
 notePin?.addEventListener('click', (e) => { e.stopPropagation(); btnPin.click(); syncNoteButtons(); });
-noteChev?.addEventListener('click', (e) => { e.stopPropagation(); toggleNoteCollapse(); });
+noteChev?.addEventListener('click', (e) => { e.stopPropagation(); noteui.toggleCollapse(); });
 notePlayBtn?.addEventListener('click', (e) => { e.stopPropagation(); btnPlay.click(); });
 notePauseBtn?.addEventListener('click', (e) => { e.stopPropagation(); btnPause.click(); });
 document.getElementById('note-reset')?.addEventListener('click', (e) => { e.stopPropagation(); btnReset.click(); });
 document.getElementById('note-break')?.addEventListener('click', (e) => { e.stopPropagation(); btnBreak.click(); });
 document.getElementById('note-pomo')?.addEventListener('click', (e) => { e.stopPropagation(); btnPomo.click(); });
 document.getElementById('note-template-btn')?.addEventListener('click', (e) => { e.stopPropagation(); cycleTemplate(); });
+
+// 円テンプレート: 作業リストのドロワー開閉
+classicListToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleClassicDrawer(); });
 
 noteTimer?.addEventListener('click', () => {
   if (completionActive) { dismissCompletion(); return; }
@@ -1308,10 +1372,13 @@ noteTimerInput?.addEventListener('keydown', (e) => {
 });
 noteTimerInput?.addEventListener('blur', () => closeNoteEdit(true));
 
-// ノート上のスクロールでカウントダウン時間を調整（停止中のみ）
+// ノート上のホイール操作。
+//   Ctrl+ホイール → ウィンドウ全体の拡大縮小（noteui）
+//   通常ホイール → カウントダウン時間の調整（停止中のみ）
 noteTpl?.addEventListener('wheel', (e) => {
   e.preventDefault();
-  if (e.ctrlKey || st.running || st.mode !== 'countdown') return;
+  if (e.ctrlKey) { noteui.nudgeScale(e.deltaY > 0 ? -1 : 1); return; }  // 下スクロールで縮小（円テンプレートと同じ向き）
+  if (st.running || st.mode !== 'countdown') return;
   const delta = e.deltaY > 0 ? 60 : -60;
   st.total = Math.max(60, Math.min(28800, st.total + delta));
   refreshText();
@@ -1344,10 +1411,15 @@ noteTpl?.addEventListener('wheel', (e) => {
   if (st.themeIdx < 0) st.themeIdx = 0;
 
   currentWindowSize = storageGet('mt_window_size', 280);
+  classicOpen = Boolean(storageGet('mt_classic_open', false));
+  classicListToggle?.classList.toggle('open', classicOpen);
+
+  // ノートのウィンドウ幾何（自動高さ・リサイズ・拡大縮小・開閉）を初期化
+  noteui.initNoteUI({ noteTpl, invoke: (cmd, args) => window.__TAURI__?.core?.invoke?.(cmd, args) });
 
   // 進行中タスク（作業リスト）を初期化
   noteDate.textContent = new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
-  tasks.initTasks({ container: noteList, addInput: noteAddInput, log: logTaskSpan });
+  tasks.initTasks({ container: noteList, addInput: noteAddInput, log: logTaskSpan, onLayoutChange: onTaskLayoutChanged });
   renderNoteTally();
 
   refreshText();
@@ -1390,7 +1462,10 @@ document.addEventListener('mousemove', (e) => {
   const cy = rect.height / 2;
   const r  = rect.width / 2;
   const inCircle = (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
-  const shouldPassthrough = !inCircle;
+  // 円の下に作業リストのドロワーがある場合、その領域は不透明なので透過させない。
+  // 透過するのは上部正方形の透明コーナー（円の外）だけに限定する。
+  const inTopSquare = y <= rect.bottom - rect.top && x >= 0 && x <= rect.width;
+  const shouldPassthrough = inTopSquare && !inCircle;
   if (shouldPassthrough !== _cursorPassthrough) {
     _cursorPassthrough = shouldPassthrough;
     window.__TAURI__?.core?.invoke?.('set_cursor_passthrough', { ignore: shouldPassthrough });
